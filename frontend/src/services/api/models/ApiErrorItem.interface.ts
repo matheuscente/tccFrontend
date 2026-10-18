@@ -1,4 +1,4 @@
 export interface ApiErrorItem {
-  field: string;
+  field?: string;
   message: string;
 }

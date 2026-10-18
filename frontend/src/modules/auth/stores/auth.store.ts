@@ -1,13 +1,13 @@
 import { defineStore } from "pinia";
-import { Service } from "@/services/abstract/service.abstract";
-import { http, refreshSession } from "@/services/api/api";
+import { api } from "@/services/api/http";
+import { refreshSession } from "@/services/api/api";
 import type { Login } from "../models/login.dto";
 import type { ApiError } from "@/services/api/models/ApiError.interface";
 import { isError } from "@/services/api/isError.typeGuard";
 import { router } from "@/router";
 import { routeProps } from "@/router/RouteProps";
+import type { UserResponseDTO } from "@/modules/user/models/DTO/UserResponseDto";
 
-const service = new Service(http);
 const url = "/auth";
 
 let loggingOut = false;
@@ -17,11 +17,17 @@ export const useAuthStore = defineStore("auth", {
     token: null as string | null,
     isAuthenticated: false,
     expiresAt: null as number | null,
+    user: null as UserResponseDTO | null,
   }),
+
+  getters: {
+    isAdmin: (state) => state.user?.role === "ADMIN",
+    userId: (state) => state.user?.id ?? "",
+  },
 
   actions: {
     async login(username: string, password: string): Promise<ApiError | void> {
-      const response = await service.post<Login>(`${url}/login`, { username, password });
+      const response = await api.post<Login>(`${url}/login`, { username, password });
 
       if (isError(response)) return response;
 
@@ -31,6 +37,13 @@ export const useAuthStore = defineStore("auth", {
       this.setToken(session.accessToken);
       this.setExpiresAt(session.sessionExpiresAt);
       this.setIsAuth(true);
+
+      await this.loadUser();
+    },
+
+    async loadUser(): Promise<void> {
+      const response = await api.get<UserResponseDTO>("/users/me");
+      if (!isError(response)) this.user = response.data[0] ?? null;
     },
 
     async logout(): Promise<void> {
@@ -38,11 +51,11 @@ export const useAuthStore = defineStore("auth", {
       loggingOut = true;
 
       try {
-        await service.post(`${url}/logout`);
+        if (this.token) await api.delete(`${url}/logout`);
       } finally {
         this.clearSession();
         loggingOut = false;
-        router.push({ name: routeProps.login.name});
+        router.push({ name: routeProps.login.name });
       }
     },
 
@@ -50,6 +63,7 @@ export const useAuthStore = defineStore("auth", {
       try {
         await refreshSession(this);
         this.setIsAuth(true);
+        await this.loadUser();
       } catch {
         this.clearSession();
       }
@@ -59,11 +73,13 @@ export const useAuthStore = defineStore("auth", {
       this.setToken(null);
       this.setExpiresAt(null);
       this.setIsAuth(false);
+      this.user = null;
     },
 
     isSessionExpired(): boolean {
       if (!this.expiresAt) return true;
-      return Date.now() >= this.expiresAt;
+      // a API envia a expiração em segundos
+      return Date.now() >= this.expiresAt * 1000;
     },
 
     setToken(token: string | null) {

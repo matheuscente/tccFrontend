@@ -1,169 +1,103 @@
 <template>
-  <v-app>
-    <v-main class="login">
-      <v-card class="login-card pa-6" elevation="4">
-        <v-card-title class="text-h5 text-center">
-          Entrar
-        </v-card-title>
+  <AuthShell title="Entrar">
+    <v-form ref="form" @submit.prevent="handleLogin">
+      <v-text-field
+        v-model="username"
+        label="Usuário ou e-mail"
+        prepend-inner-icon="mdi-account-outline"
+        autocomplete="username"
+        :rules="[required('Usuário ou e-mail'), minLength(4, 'Usuário ou e-mail')]"
+        :error-messages="fieldErrors.username"
+        class="mb-2"
+        autofocus
+      />
 
-        <v-card-text>
-          <v-form ref="form" v-model="isValid" @submit.prevent="handleLogin">
+      <v-text-field
+        v-model="password"
+        label="Senha"
+        prepend-inner-icon="mdi-lock-outline"
+        :type="showPassword ? 'text' : 'password'"
+        :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+        autocomplete="current-password"
+        :rules="[required('Senha'), minLength(8, 'Senha')]"
+        :error-messages="fieldErrors.password"
+        class="mb-1"
+        @click:append-inner="showPassword = !showPassword"
+      />
 
-            <v-text-field v-for="item in formItems" v-bind="defaultInputProps" :v-model="item.model" :error-messages="item.errorMessage.value" :rules="item.rules" :type="item.type" :label="item.label"/>
+      <div class="text-right mb-4">
+        <router-link :to="{ name: routeProps.forgotPassword.name }" class="text-body-medium text-primary">
+          Esqueci minha senha
+        </router-link>
+      </div>
 
-            <v-alert v-if="loginError" type="error" variant="tonal" class="mb-5 multi-line-alert">
-              {{ loginError }}
-            </v-alert>
+      <v-alert v-if="loginError" type="error" variant="tonal" density="compact" class="mb-4 pre-line">
+        {{ loginError }}
+      </v-alert>
 
-            <v-btn block color="primary" size="large" type="submit" :disabled="!isValid">
-              Entrar
-            </v-btn>
-          </v-form>
+      <v-btn block color="primary" size="large" type="submit" :loading="loading">Entrar</v-btn>
+    </v-form>
 
+    <v-divider class="my-5" />
 
-          <v-btn block color="secondary" size="large" class="mt-5" @click="handleRegister">
-            Cadastrar
-          </v-btn>
-        </v-card-text>
-      </v-card>
-    </v-main>
-  </v-app>
+    <div class="text-center text-body-medium">
+      Ainda não tem conta?
+      <router-link :to="{ name: routeProps.register.name }" class="text-primary font-weight-medium">Cadastre-se</router-link>
+    </div>
+  </AuthShell>
 </template>
 
-<style scoped>
-.multi-line-alert {
-  white-space: pre-line;
-}
-
-.login {
-  min-height: 100vh;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.login-card {
-  width: 100%;
-  max-width: 400px;
-}
-</style>
-
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
-import { useAuthStore } from '../stores/auth.store';
-import type { VForm } from 'vuetify/components';
-import { router } from '@/router';
-import { routeProps } from '@/router/RouteProps';
-import type { FormItems } from '@/modules/user/models/interfaces/FormItems.interface';
+import { ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import type { VForm } from "vuetify/components";
+import AuthShell from "@/components/auth/AuthShell.vue";
+import { useAuthStore } from "../stores/auth.store";
+import { routeProps } from "@/router/RouteProps";
+import { minLength, required } from "@/utils/rules";
+import { splitApiErrors } from "@/utils/apiErrors";
 
-const usernameRules = [
-  (v: string) =>
-    (!!v && v.length >= 4) ||
-    "O nome de usuário precisa ter pelo menos 4 caracteres."
-]
+const authStore = useAuthStore();
+const router = useRouter();
+const route = useRoute();
 
-const passwordRules = [
-  (v: string) =>
-    (!!v && v.length >= 8) ||
-    "A senha precisa ter pelo menos 8 caracteres."
-
-]
-
-const defaultInputProps = {
-  class: "mb-2",
-  variant: "outlined",
-  density: "compact",
-  required: true
-} as const
-
-
-
-const authSore = useAuthStore()
-
-const username = ref("")
-const password = ref("")
-const loginError = ref<string | undefined>(undefined)
-const passwordErrorMessage = ref<string | undefined>(undefined)
-const usernameErrorMessage = ref<string | undefined>(undefined)
-
-const form = ref<VForm | null>(null)
-const isValid = ref(false)
-
-const formItems: FormItems[] = [
-    {
-    label: "Nome de usuário",
-    rules: usernameRules,
-    model: username,
-    errorMessage: usernameErrorMessage,
-    type: "text"
-  },
-
-  {
-    label: "Senha",
-    rules: passwordRules,
-    model: password,
-    errorMessage: passwordErrorMessage,
-    type: "password"
-
-  }
-]
+const form = ref<VForm | null>(null);
+const username = ref("");
+const password = ref("");
+const showPassword = ref(false);
+const loading = ref(false);
+const loginError = ref<string>();
+const fieldErrors = ref<Record<string, string>>({});
 
 const handleLogin = async () => {
+  if (!form.value) return;
 
-  if (!form.value) return
+  loginError.value = undefined;
+  fieldErrors.value = {};
 
-  usernameErrorMessage.value = ""
+  const { valid } = await form.value.validate();
+  if (!valid) return;
 
-  passwordErrorMessage.value = ""
+  loading.value = true;
+  try {
+    const response = await authStore.login(username.value.trim(), password.value);
 
-  loginError.value = undefined
-
-
-  const result = await form.value.validate()
-
-  if (result.valid) {
-    const response = await authSore.login(username.value, password.value)
-
-    if (!response) {
-      console.log(authSore.token)
-      console.log(authSore.isAuthenticated)
-      console.log(authSore.expiresAt)
-      return
+    if (response?.state === "error") {
+      const { fields, general } = splitApiErrors(response);
+      fieldErrors.value = fields;
+      loginError.value = general;
+      return;
     }
 
-    if (response.state === 'error') {
-      console.log(response.data)
-      response.data.forEach(item => {
-        if (item.field) {
-          if (item.field === "password") {
-            passwordErrorMessage.value = item.message
-          } else {
-            usernameErrorMessage.value = item.message
-          }
-        }
-      })
-
-      loginError.value = response.data.find(item => !item.field)?.message
-      await nextTick()
-      await form.value.validate()
-    }
+    const redirect = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/") ? route.query.redirect : null;
+    router.push(redirect ?? { name: routeProps.home.name });
+  } finally {
+    loading.value = false;
   }
-}
+};
 
-const handleRegister = () => {
-  router.push({name: routeProps.register.name})
-}
-
-watch(password, () => {
-  passwordErrorMessage.value = ""
-  loginError.value = undefined
-})
-
-watch(username, () => {
-  usernameErrorMessage.value = ""
-  loginError.value = undefined
-})
-
-
+watch([username, password], () => {
+  fieldErrors.value = {};
+  loginError.value = undefined;
+});
 </script>

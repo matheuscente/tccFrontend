@@ -1,5 +1,3 @@
-import { useAuthStore } from "../auth.store";
+import type { useAuthStore } from "../auth.store";
 
-const authStore = useAuthStore()
-
-export type UseAuthStore = typeof authStore
+export type UseAuthStore = ReturnType<typeof useAuthStore>

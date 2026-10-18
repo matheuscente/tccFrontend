@@ -4,3 +4,21 @@ body,
   height: 100%;
   margin: 0;
 }
+
+.pre-line {
+  white-space: pre-line;
+}
+
+.pre-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.max-w-page {
+  max-width: 1280px;
+  margin-inline: auto;
+}

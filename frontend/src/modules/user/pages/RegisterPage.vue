@@ -1,219 +1,147 @@
 <template>
-  <v-app>
-    <v-main class="register">
-      <v-card class="register-card pa-6" elevation="4">
-        <v-card-title class="text-h5 text-center">
-          Cadastre-se
-        </v-card-title>
+  <AuthShell title="Cadastre-se" subtitle="Crie sua conta para começar a organizar seus estudos">
+    <v-form ref="form" @submit.prevent="handleRegister">
+      <v-text-field
+        v-model="formData.name"
+        label="Nome completo"
+        prepend-inner-icon="mdi-card-account-details-outline"
+        autocomplete="name"
+        :rules="[required('Nome'), minLength(5, 'Nome'), maxLength(50, 'Nome')]"
+        :error-messages="fieldErrors.name"
+        class="mb-2"
+      />
+      <v-text-field
+        v-model="formData.email"
+        label="E-mail"
+        type="email"
+        prepend-inner-icon="mdi-email-outline"
+        autocomplete="email"
+        :rules="[required('E-mail'), email]"
+        :error-messages="fieldErrors.email"
+        class="mb-2"
+      />
+      <v-text-field
+        v-model="formData.username"
+        label="Nome de usuário"
+        prepend-inner-icon="mdi-account-outline"
+        autocomplete="username"
+        hint="De 5 a 20 caracteres: letras, números e _"
+        :rules="[required('Nome de usuário'), minLength(5, 'Nome de usuário'), maxLength(20, 'Nome de usuário'), usernameRule]"
+        :error-messages="fieldErrors.username"
+        class="mb-2"
+      />
+      <v-text-field
+        v-model="formData.birthDate"
+        label="Data de nascimento"
+        type="date"
+        prepend-inner-icon="mdi-cake-variant-outline"
+        :max="todayInput()"
+        :rules="[required('Data de nascimento'), notFuture]"
+        :error-messages="fieldErrors.birthDate"
+        class="mb-2"
+      />
+      <v-text-field
+        v-model="formData.password"
+        label="Senha"
+        :type="showPassword ? 'text' : 'password'"
+        prepend-inner-icon="mdi-lock-outline"
+        :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+        autocomplete="new-password"
+        hint="Mínimo de 8 caracteres, com letra maiúscula, minúscula e número"
+        :rules="[strongPassword]"
+        :error-messages="fieldErrors.password"
+        class="mb-2"
+        @click:append-inner="showPassword = !showPassword"
+      />
+      <v-text-field
+        v-model="confirmPassword"
+        label="Confirme a senha"
+        :type="showPassword ? 'text' : 'password'"
+        prepend-inner-icon="mdi-lock-check-outline"
+        autocomplete="new-password"
+        :rules="[(v: string) => v === formData.password || 'As senhas não conferem.']"
+        class="mb-2"
+      />
 
-        <v-card-text>
-          <v-form ref="form" v-model="isValid" @submit.prevent="handleRegister">
+      <v-alert v-if="registerError" type="error" variant="tonal" density="compact" class="mb-4 pre-line">
+        {{ registerError }}
+      </v-alert>
 
-            <v-text-field v-for="item in formItems" v-bind="defaultInputProps" :v-model="item.model" :error-messages="item.errorMessage.value" :rules="item.rules" :label="item.label" :type="item.type"/>
-
-            <v-alert v-if="registerError" type="error" variant="tonal" class="mb-5 multi-line-alert">
-              {{ registerError }}
-            </v-alert>
-
-
-            <div class="d-flex justify-between">
-
-              <v-btn block color="primary" size="large" type="submit" :disabled="!isValid">
-              Cadastrar
-            </v-btn>
-            <v-btn block color="secondary" size="large" class="mt-5" @click="handleBack">
-            Voltar
-          </v-btn>
-            </div>
-            
-          </v-form>
-        </v-card-text>
-      </v-card>
-    </v-main>
-  </v-app>
+      <v-btn block color="primary" size="large" type="submit" :loading="loading">Criar conta</v-btn>
+      <v-btn block variant="text" class="mt-3" :to="{ name: routeProps.login.name }">Já tenho conta</v-btn>
+    </v-form>
+  </AuthShell>
 </template>
 
-<style scoped>
-.multi-line-alert {
-  white-space: pre-line;
-}
-
-.register {
-  min-height: 100vh;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.register-card {
-  width: 100%;
-  max-width: 400px;
-}
-</style>
-
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
-import { useAuthStore } from '@/modules/auth/stores/auth.store';
-import type { VForm } from 'vuetify/components';
-import { router } from '@/router';
-import { routeProps } from '@/router/RouteProps';
-import type { FormItems } from '../models/interfaces/FormItems.interface';
+import { reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import type { VForm } from "vuetify/components";
+import AuthShell from "@/components/auth/AuthShell.vue";
+import { useAuthStore } from "@/modules/auth/stores/auth.store";
+import { userService } from "../services/user.service";
+import { routeProps } from "@/router/RouteProps";
+import { isError } from "@/services/api/isError.typeGuard";
+import { splitApiErrors } from "@/utils/apiErrors";
+import { inputToApiDate, todayInput } from "@/utils/date";
+import { email, maxLength, minLength, notFuture, required, strongPassword, username as usernameRule } from "@/utils/rules";
+import { useNotifyStore } from "@/stores/notify.store";
 
-const usernameRules = [
-  (v: string) =>
-    (!!v && v.length >= 4) ||
-    "O nome de usuário precisa ter pelo menos 4 caracteres."
-]
+const router = useRouter();
+const authStore = useAuthStore();
+const notify = useNotifyStore();
 
-const nameRules = [
-  (v: string) =>
-    (!!v && v.length >= 4) ||
-    "O nome precisa ter pelo menos 4 caracteres."
-]
-
-
-const passwordRules = [
-  (v: string) =>
-    (!!v && v.length >= 8) ||
-    "A senha precisa ter pelo menos 8 caracteres."
-]
-
-const birthDateRules = [
-  (v: string) =>
-    (!!v && v.length >= 8) ||
-    "A senha precisa ter pelo menos 8 caracteres."
-]
-
-const defaultInputProps = {
-  class: "mb-2",
-  variant: "outlined",
-  density: "compact",
-  required: true
-} as const
-
-
-
-const authSore = useAuthStore()
-
-const username = ref("")
-const name = ref("")
-const birthDate = ref("")
-const password = ref("")
-const registerError = ref<string | undefined>(undefined)
-const passwordErrorMessage = ref<string | undefined>(undefined)
-const usernameErrorMessage = ref<string | undefined>(undefined)
-const nameErrorMessage = ref<string | undefined>(undefined)
-const birthDateErrorMessage = ref<string | undefined>(undefined)
-
-const form = ref<VForm | null>(null)
-const isValid = ref(false)
-
-  const formItems: FormItems[] = [
-  {
-    label: "Nome completo",
-    rules: nameRules,
-    model: name,
-    errorMessage: nameErrorMessage,
-    type: "text"
-  }, 
-
-  {
-    label: "Data de nascimento",
-    rules: birthDateRules,
-    model: birthDate,
-    errorMessage: birthDateErrorMessage,
-    type: "text"
-  },
-
-  {
-    label: "Nome de usuário",
-    rules: usernameRules,
-    model: username,
-    errorMessage: usernameErrorMessage,
-    type: "text"
-  },
-
-  {
-    label: "Senha",
-    rules: passwordRules,
-    model: password,
-    errorMessage: passwordErrorMessage,
-    type: "password"
-
-  }
-]
+const form = ref<VForm | null>(null);
+const formData = reactive({ name: "", email: "", username: "", birthDate: "", password: "" });
+const confirmPassword = ref("");
+const showPassword = ref(false);
+const loading = ref(false);
+const registerError = ref<string>();
+const fieldErrors = ref<Record<string, string>>({});
 
 const handleRegister = async () => {
+  if (!form.value) return;
 
-  if (!form.value) return
+  registerError.value = undefined;
+  fieldErrors.value = {};
 
-  usernameErrorMessage.value = ""
+  const { valid } = await form.value.validate();
+  if (!valid) return;
 
-  passwordErrorMessage.value = ""
+  loading.value = true;
+  try {
+    const response = await userService.create({
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      username: formData.username.trim(),
+      password: formData.password,
+      birthDate: inputToApiDate(formData.birthDate),
+    });
 
-  nameErrorMessage.value = ""
-
-  birthDateErrorMessage.value = ""
-
-  registerError.value = undefined
-
-
-  const result = await form.value.validate()
-
-  if (result.valid) {
-    const response = await authSore.login(username.value, password.value)
-
-    if (!response) {
-      console.log(authSore.token)
-      console.log(authSore.isAuthenticated)
-      console.log(authSore.expiresAt)
-      return
+    if (isError(response)) {
+      const { fields, general } = splitApiErrors(response);
+      fieldErrors.value = fields;
+      registerError.value = general;
+      return;
     }
 
-    if (response.state === 'error') {
-      console.log(response.data)
-      response.data.forEach(item => {
-        if (item.field) {
-          if (item.field === "password") {
-            passwordErrorMessage.value = item.message
-          } else {
-            usernameErrorMessage.value = item.message
-          }
-        }
-      })
-
-      registerError.value = response.data.find(item => !item.field)?.message
-      await nextTick()
-      await form.value.validate()
+    // entra direto após o cadastro
+    const loginError = await authStore.login(formData.username.trim(), formData.password);
+    if (loginError) {
+      notify.success("Conta criada! Faça login para continuar.");
+      router.push({ name: routeProps.login.name });
+      return;
     }
+
+    notify.success("Conta criada com sucesso. Bem-vindo(a)!");
+    router.push({ name: routeProps.home.name });
+  } finally {
+    loading.value = false;
   }
-}
+};
 
-const handleBack = () => {
-  router.push({
-    name: routeProps.login.name
-  })
-}
-
-watch(password, () => {
-  passwordErrorMessage.value = ""
-  registerError.value = undefined
-})
-
-watch(username, () => {
-  usernameErrorMessage.value = ""
-  registerError.value = undefined
-})
-
-watch(name, () => {
-  nameErrorMessage.value = ""
-  registerError.value = undefined
-})
-
-watch(birthDate, () => {
-  birthDateErrorMessage.value = ""
-  registerError.value = undefined
-})
-
+watch(formData, () => {
+  fieldErrors.value = {};
+  registerError.value = undefined;
+});
 </script>

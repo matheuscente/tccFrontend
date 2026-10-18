@@ -4,9 +4,16 @@ export interface UserResponseDTO {
     id: string,
     name: string,
     username: string,
+    email: string,
     role: UserRole,
-    birthDate: Date,
-    createdAt: Date,
-    updatedAt: Date
+    birthDate: string,
+    createdAt: string,
+    updatedAt: string
+}
 
+export interface PaginatedUsersDTO {
+    items: UserResponseDTO[]
+    total: number
+    page: number
+    pageSize: number
 }

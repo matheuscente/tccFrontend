@@ -5,21 +5,25 @@ import { routeProps } from "./RouteProps";
 
 const router = createRouter({
     history: createWebHistory(),
-    routes
+    routes,
+    scrollBehavior: () => ({ top: 0 }),
 })
 
 router.afterEach((to) => {
-    document.title = to.meta.title ?? "My Study"
+    document.title = to.meta.title ? `${to.meta.title} · My Study` : "My Study"
 })
-
 
 router.beforeEach((to) => {
   const auth = useAuthStore();
   const loggedIn = !!auth.getToken() && !auth.isSessionExpired();
 
-  if (to.meta.requiresAuth && !loggedIn) return { name: routeProps.login.name };
-  if (to.name === routeProps.login.name && loggedIn) return { name: "home" };
+  if (to.matched.some((record) => record.meta.requiresAuth) && !loggedIn) {
+    return { name: routeProps.login.name, query: to.fullPath !== "/dashboard" ? { redirect: to.fullPath } : {} };
+  }
+
+  if (to.meta.guestOnly && loggedIn) return { name: routeProps.home.name };
+
+  if (to.meta.requiresAdmin && !auth.isAdmin) return { name: routeProps.home.name };
 });
 
 export { router }
-
