@@ -88,9 +88,9 @@
                   <v-list-item-title class="text-wrap text-body-medium">{{ question.statement }}</v-list-item-title>
                   <v-list-item-subtitle><ScopeLabel :scope="question" /></v-list-item-subtitle>
                   <template #append>
-                    <v-btn icon="mdi-arrow-up" variant="text" size="small" :disabled="index === 0" aria-label="Mover para cima" @click="move(index, -1)" />
-                    <v-btn icon="mdi-arrow-down" variant="text" size="small" :disabled="index === selectedQuestions.length - 1" aria-label="Mover para baixo" @click="move(index, 1)" />
-                    <v-btn icon="mdi-close" variant="text" size="small" color="error" aria-label="Remover" @click="removeQuestion(index)" />
+                    <v-btn icon="mdi-arrow-up" variant="text" size="small" :disabled="index === 0" :aria-label="`Mover questão ${index + 1} para cima`" @click="move(index, -1)" />
+                    <v-btn icon="mdi-arrow-down" variant="text" size="small" :disabled="index === selectedQuestions.length - 1" :aria-label="`Mover questão ${index + 1} para baixo`" @click="move(index, 1)" />
+                    <v-btn icon="mdi-close" variant="text" size="small" color="error" :aria-label="`Remover questão ${index + 1} da atividade`" @click="removeQuestion(index)" />
                   </template>
                 </v-list-item>
               </v-list>
@@ -123,7 +123,14 @@
                     <td>{{ attempt.correctCount }}/{{ attempt.totalQuestions }}</td>
                     <td>{{ formatDuration(attempt.durationSeconds) }}</td>
                     <td class="text-right">
-                      <v-btn variant="text" size="small" :to="{ name: routeProps.attemptResult.name, params: { id: attempt.id } }">Ver</v-btn>
+                      <v-btn
+                        variant="text"
+                        size="small"
+                        :aria-label="`Ver resultado de ${formatDateTime(attempt.finishedAt)}`"
+                        :to="{ name: routeProps.attemptResult.name, params: { id: attempt.id } }"
+                      >
+                        Ver
+                      </v-btn>
                     </td>
                   </tr>
                 </tbody>
@@ -165,16 +172,18 @@ import EmptyState from "@/components/EmptyState.vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
 import LineChart from "@/components/charts/LineChart.vue";
 import { useApi } from "@/composables/useApi";
+import { useLeaveGuard } from "@/composables/useLeaveGuard";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { routeProps } from "@/router/RouteProps";
 import { formatDateTime, formatDuration } from "@/utils/date";
 import { maxLength, minLength, required } from "@/utils/rules";
-import type { Question } from "@/modules/questions/models/question.model";
+import { formatScore, scoreColor } from "@/utils/score";
+import type { QuestionDTO } from "@/modules/questions/models/DTO/QuestionDto";
 import { questionService } from "@/modules/questions/services/question.service";
-import type { ActivityDetail, Attempt } from "../models/activity.model";
+import type { ActivityDetailDTO } from "../models/DTO/ActivityDto";
+import type { AttemptDTO } from "../models/DTO/AttemptDto";
 import { activityService } from "../services/activity.service";
 import QuestionPicker from "../components/QuestionPicker.vue";
-import { formatScore, scoreColor } from "../components/scoreColor";
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -182,8 +191,8 @@ const { run, runOne } = useApi();
 
 const id = computed(() => String(route.params.id));
 
-const activity = ref<ActivityDetail | null>(null);
-const attempts = ref<Attempt[]>([]);
+const activity = ref<ActivityDetailDTO | null>(null);
+const attempts = ref<AttemptDTO[]>([]);
 const loading = ref(true);
 
 const infoForm = ref<VForm | null>(null);
@@ -191,11 +200,11 @@ const title = ref("");
 const description = ref("");
 const savingInfo = ref(false);
 
-const selectedQuestions = ref<Question[]>([]);
+const selectedQuestions = ref<QuestionDTO[]>([]);
 const savingQuestions = ref(false);
 
 const addDialog = ref(false);
-const bank = ref<Question[]>([]);
+const bank = ref<QuestionDTO[]>([]);
 const loadingBank = ref(false);
 const toAdd = ref<string[]>([]);
 
@@ -206,15 +215,20 @@ const questionsChanged = computed(() => {
   return original.length !== current.length || original.some((qid, index) => qid !== current[index]);
 });
 
+useLeaveGuard(
+  () => questionsChanged.value || infoChanged.value,
+  "Há alterações não salvas nesta atividade. Deseja sair mesmo assim?",
+);
+
 const notIncluded = computed(() => bank.value.filter((question) => !selectedQuestions.value.some((item) => item.id === question.id)));
 
-// tentativas em ordem cronológica para o gráfico
+// a API devolve as tentativas da mais recente para a mais antiga
 const chronological = computed(() => [...attempts.value].reverse());
 const chartLabels = computed(() => chronological.value.map((_, index) => `#${index + 1}`));
 const chartValues = computed(() => chronological.value.map((attempt) => attempt.score));
 const chartTitles = computed(() => chronological.value.map((attempt) => formatDateTime(attempt.finishedAt)));
 
-const applyActivity = (data: ActivityDetail) => {
+const applyActivity = (data: ActivityDetailDTO) => {
   activity.value = data;
   title.value = data.title;
   description.value = data.description ?? "";

@@ -55,7 +55,7 @@
         hover
         :items-per-page="15"
         :sort-by="[{ key: 'updatedAt', order: 'desc' }]"
-        @click:row="(_: unknown, row: { item: Ticket }) => openTicket(row.item)"
+        @click:row="(_: unknown, row: { item: TicketDTO }) => openTicket(row.item)"
         class="cursor-pointer"
       >
         <template #[`item.subject`]="{ item }">
@@ -92,17 +92,22 @@ import { routeProps } from "@/router/RouteProps";
 import { formatDateTime } from "@/utils/date";
 import NewTicketDialog from "../components/NewTicketDialog.vue";
 import { ticketService } from "../services/ticket.service";
-import { ticketCategoryLabels, ticketStatusInfo, type Ticket, type TicketDetail, type TicketStatus } from "../models/ticket.model";
+import { useAuthStore } from "@/modules/auth/stores/auth.store";
+import { ticketCategoryLabels, ticketStatusInfo } from "../models/constants/ticket.constants";
+import type { TicketDetailDTO } from "../models/DTO/TicketDetailDto";
+import type { TicketDTO } from "../models/DTO/TicketDto";
+import type { TicketStatus } from "../models/Types/TicketStatus";
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
 const { run } = useApi();
 
 const adminMode = computed(() => route.meta.adminMode === true);
 
 const statusKeys = Object.keys(ticketStatusInfo) as TicketStatus[];
 
-const tickets = ref<Ticket[]>([]);
+const tickets = ref<TicketDTO[]>([]);
 const loading = ref(false);
 const status = ref<TicketStatus | null>(null);
 const search = ref<string | null>("");
@@ -113,7 +118,7 @@ const headers = computed(() => [
   { title: "Categoria", key: "category", sortable: true },
   ...(adminMode.value ? [{ title: "Usuário", key: "user", sortable: false }] : []),
   { title: "Status", key: "status", sortable: true },
-  { title: "Última interação", key: "updatedAt", sortable: true },
+  { title: "Última interação", key: "updatedAt", sortable: true, value: (item: TicketDTO) => item.lastMessageAt ?? item.updatedAt },
 ]);
 
 const counts = computed(() => {
@@ -133,28 +138,30 @@ const filtered = computed(() => {
   });
 });
 
-const badge = (ticket: Ticket) => {
+const badge = (ticket: TicketDTO) => {
   if (ticket.status === "CLOSED") return null;
   if (!adminMode.value && ticket.lastMessageByAdmin) return { label: "Nova resposta", color: "success" };
   if (adminMode.value && !ticket.lastMessageByAdmin && ticket.status === "OPEN") return { label: "Aguardando resposta", color: "warning" };
   return null;
 };
 
-const openTicket = (ticket: Ticket) => {
+const openTicket = (ticket: TicketDTO) => {
   router.push({
     name: adminMode.value ? routeProps.adminTicketDetail.name : routeProps.ticketDetail.name,
     params: { id: ticket.id },
   });
 };
 
-const onCreated = (ticket: TicketDetail) => {
+const onCreated = (ticket: TicketDetailDTO) => {
   router.push({ name: routeProps.ticketDetail.name, params: { id: ticket.id } });
 };
 
 const load = async () => {
   loading.value = true;
   try {
-    tickets.value = (await run(ticketService.list())) ?? [];
+    const data = (await run(ticketService.list())) ?? [];
+    // para administradores a API devolve os chamados de todos; na área de suporte mostra só os próprios
+    tickets.value = adminMode.value ? data : data.filter((ticket) => ticket.user.id === auth.userId);
   } finally {
     loading.value = false;
   }

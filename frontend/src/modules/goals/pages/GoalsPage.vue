@@ -41,7 +41,7 @@
             <template #append>
               <v-menu location="bottom end">
                 <template #activator="{ props: menuProps }">
-                  <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" aria-label="Ações" />
+                  <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" :aria-label="`Ações da meta ${item.goal.title}`" />
                 </template>
                 <v-list density="compact">
                   <v-list-item prepend-icon="mdi-pencil-outline" title="Editar" @click="openEdit(item.goal)" />
@@ -95,7 +95,10 @@ import EmptyState from "@/components/EmptyState.vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
 import GoalFormDialog from "../components/GoalFormDialog.vue";
 import { goalService } from "../services/goal.service";
-import { goalStatusInfo, goalTypeLabels, type Goal, type GoalProgress, type GoalProgressStatus } from "../models/goal.model";
+import { goalStatusInfo, goalTypeLabels } from "../models/constants/goal.constants";
+import type { GoalDTO } from "../models/DTO/GoalDto";
+import type { GoalProgressDTO } from "../models/DTO/GoalProgressDto";
+import type { GoalProgressStatus } from "../models/Types/GoalProgressStatus";
 import { useStructureStore } from "@/stores/structure.store";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useConfirmStore } from "@/stores/confirm.store";
@@ -104,7 +107,7 @@ import { useApi } from "@/composables/useApi";
 import { routeProps } from "@/router/RouteProps";
 import { formatDay, formatMinutes } from "@/utils/date";
 
-interface GoalItem { goal: Goal, progress: GoalProgress | undefined }
+interface GoalItem { goal: GoalDTO, progress: GoalProgressDTO | undefined }
 
 const structure = useStructureStore();
 const auth = useAuthStore();
@@ -116,7 +119,7 @@ const loading = ref(true);
 const items = ref<GoalItem[]>([]);
 const statusFilter = ref<"ALL" | GoalProgressStatus>("ALL");
 const dialog = ref(false);
-const editing = ref<Goal | null>(null);
+const editing = ref<GoalDTO | null>(null);
 
 const filterOptions: { value: "ALL" | GoalProgressStatus, label: string }[] = [
   { value: "ALL", label: "Todas" },
@@ -151,7 +154,7 @@ const openCreate = () => {
   dialog.value = true;
 };
 
-const openEdit = (goal: Goal) => {
+const openEdit = (goal: GoalDTO) => {
   editing.value = goal;
   dialog.value = true;
 };
@@ -161,7 +164,7 @@ const onSaved = async () => {
   await load();
 };
 
-const remove = async (goal: Goal) => {
+const remove = async (goal: GoalDTO) => {
   const ok = await confirm.ask({ title: "Excluir meta", message: `Excluir a meta "${goal.title}"?`, confirmText: "Excluir" });
   if (!ok) return;
   if (await run(goalService.remove(goal.id), "Meta excluída.")) await load();

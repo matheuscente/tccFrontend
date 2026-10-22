@@ -1,30 +1,27 @@
 const pad = (value: number) => String(value).padStart(2, "0");
 
-/** "2025-12-31" (input type=date) -> "31/12/2025" (formato da API) */
+// input type=date ("aaaa-mm-dd") -> formato exigido pela API ("dd/mm/aaaa")
 export const inputToApiDate = (value: string): string => {
   const [year, month, day] = value.split("-");
   return `${day}/${month}/${year}`;
 };
 
-/** ISO da API -> "2025-12-31" para input type=date (datas da API são meia-noite UTC) */
+// datas "dia" da API vêm como meia-noite UTC: corta a string em vez de converter pelo fuso
 export const isoToInputDate = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10) : "");
 
-/** Data de hoje no formato do input type=date, no fuso do navegador */
-export const todayInput = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
+export const toInputDate = (date: Date): string =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+export const todayInput = (): string => toInputDate(new Date());
 
 export const todayApi = (): string => inputToApiDate(todayInput());
 
-/** Formata uma data "dia" (meia-noite UTC) sem deslocar pelo fuso. */
 export const formatDay = (iso: string | null | undefined): string => {
   if (!iso) return "—";
   const [year, month, day] = iso.slice(0, 10).split("-");
   return `${day}/${month}/${year}`;
 };
 
-/** Formata data e hora no fuso do navegador. */
 export const formatDateTime = (iso: string | null | undefined): string => {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -57,7 +54,6 @@ export const formatBytes = (bytes: number): string => {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 };
 
-/** "2025-12-31" -> "31/12" (rótulos de gráfico) */
 export const shortDay = (key: string): string => {
   const [, month, day] = key.split("-");
   return `${day}/${month}`;

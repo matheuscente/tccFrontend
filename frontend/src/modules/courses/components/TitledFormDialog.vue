@@ -16,7 +16,7 @@
           <v-textarea
             v-model="data.description"
             label="Descrição (opcional)"
-            :rules="[minLength(minDescription, 'Descrição'), maxLength(500, 'Descrição')]"
+            :rules="[minLength(minDescription, 'Descrição'), maxLength(500, 'Descrição'), keepDescription]"
             :error-messages="fieldErrors.description"
             counter="500"
             rows="3"
@@ -41,20 +41,17 @@ import type { ApiResult } from "@/services/abstract/service.abstract";
 import { isError } from "@/services/api/isError.typeGuard";
 import { splitApiErrors } from "@/utils/apiErrors";
 import { maxLength, minLength, required } from "@/utils/rules";
-import type { TitledInput } from "../models/structure.model";
+import type { TitledInputDTO } from "../models/DTO/TitledInputDto";
 
-/**
- * Diálogo reutilizado para criar/editar curso, módulo e disciplina (título + descrição).
- * O pai passa a função "save" que chama a API; o diálogo trata os erros de validação.
- */
 const props = withDefaults(defineProps<{
   modelValue: boolean
   title: string
   initial?: { title: string, description: string | null } | null
   minTitle?: number
   minDescription?: number
-  save: (data: TitledInput) => Promise<ApiResult<unknown>>
-}>(), { initial: null, minTitle: 3, minDescription: 3 });
+  allowClearDescription?: boolean
+  save: (data: TitledInputDTO) => Promise<ApiResult<unknown>>
+}>(), { initial: null, minTitle: 3, minDescription: 3, allowClearDescription: false });
 
 const emit = defineEmits<{ "update:modelValue": [value: boolean], saved: [] }>();
 
@@ -73,6 +70,11 @@ watch(() => props.modelValue, (open) => {
   form.value?.resetValidation();
 });
 
+// cursos e módulos não aceitam descrição vazia nem nula na API; disciplinas aceitam null
+const keepDescription = (value: unknown) =>
+  props.allowClearDescription || !props.initial?.description || String(value ?? "").trim() !== ""
+  || "A descrição não pode ser removida, apenas alterada.";
+
 const submit = async () => {
   if (!form.value) return;
   fieldErrors.value = {};
@@ -82,9 +84,9 @@ const submit = async () => {
   if (!valid) return;
 
   const description = data.description.trim();
-  const payload: TitledInput = { title: data.title.trim() };
-  // descrição vazia: na criação é omitida; na edição só envia se houver texto
+  const payload: TitledInputDTO = { title: data.title.trim() };
   if (description) payload.description = description;
+  else if (props.initial?.description && props.allowClearDescription) payload.description = null;
 
   loading.value = true;
   try {

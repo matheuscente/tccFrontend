@@ -10,7 +10,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStructureStore } from "@/stores/structure.store";
-import type { Scope } from "@/modules/courses/models/structure.model";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
 
 const props = withDefaults(defineProps<{ scope: Scope, showEmpty?: boolean }>(), { showEmpty: false });
 

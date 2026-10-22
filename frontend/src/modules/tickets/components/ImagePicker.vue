@@ -80,7 +80,6 @@ const remove = (index: number) => {
   emit("update:modelValue", next);
 };
 
-// libera as URLs de arquivos removidos
 watch(() => props.modelValue, (files) => {
   for (const [file, url] of urls) {
     if (!files.includes(file)) {

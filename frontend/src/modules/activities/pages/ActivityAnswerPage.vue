@@ -8,6 +8,15 @@
       <v-btn :to="{ name: routeProps.activities.name }">Voltar para as atividades</v-btn>
     </EmptyState>
 
+    <EmptyState
+      v-else-if="total === 0"
+      icon="mdi-help-circle-outline"
+      title="Esta atividade ainda não tem questões"
+      text="Adicione questões à atividade para poder respondê-la."
+    >
+      <v-btn :to="{ name: routeProps.activityDetail.name, params: { id: activity.id } }">Gerenciar atividade</v-btn>
+    </EmptyState>
+
     <template v-else>
       <PageHeader :title="activity.title" :subtitle="activity.description ?? undefined" :back="{ name: routeProps.activityDetail.name, params: { id: activity.id } }" />
 
@@ -64,6 +73,7 @@
                   :key="question.id"
                   size="small"
                   min-width="40"
+                  :aria-label="`Ir para a questão ${index + 1}${answers[question.id] ? ' (respondida)' : ''}`"
                   :variant="index === current ? 'flat' : 'tonal'"
                   :color="answers[question.id] ? 'success' : index === current ? 'primary' : undefined"
                   @click="current = index"
@@ -92,7 +102,8 @@ import { useApi } from "@/composables/useApi";
 import { useConfirmStore } from "@/stores/confirm.store";
 import { routeProps } from "@/router/RouteProps";
 import { formatDuration } from "@/utils/date";
-import type { ActivityForAnswering } from "../models/activity.model";
+import { useLeaveGuard } from "@/composables/useLeaveGuard";
+import type { ActivityForAnsweringDTO } from "../models/DTO/ActivityForAnsweringDto";
 import { activityService } from "../services/activity.service";
 
 const route = useRoute();
@@ -100,11 +111,12 @@ const router = useRouter();
 const confirm = useConfirmStore();
 const { runOne } = useApi();
 
-const activity = ref<ActivityForAnswering | null>(null);
+const activity = ref<ActivityForAnsweringDTO | null>(null);
 const loading = ref(true);
 const submitting = ref(false);
 const current = ref(0);
 const answers = reactive<Record<string, string | null>>({});
+const submitted = ref(false);
 const startedAt = ref(new Date());
 const now = ref(Date.now());
 let ticker: ReturnType<typeof setInterval> | undefined;
@@ -117,13 +129,18 @@ const currentAnswered = computed(() => {
 });
 const elapsed = computed(() => Math.floor((now.value - startedAt.value.getTime()) / 1000));
 
+useLeaveGuard(
+  () => !submitted.value && answeredCount.value > 0,
+  "Suas respostas ainda não foram enviadas e serão perdidas. Deseja sair mesmo assim?",
+);
+
 const clearCurrent = () => {
   const question = activity.value?.questions[current.value];
   if (question) answers[question.id] = null;
 };
 
 const submit = async () => {
-  if (!activity.value || submitting.value) return;
+  if (!activity.value || !total.value || submitting.value) return;
 
   const missing = total.value - answeredCount.value;
   const ok = await confirm.ask({
@@ -142,7 +159,10 @@ const submit = async () => {
       startedAt: startedAt.value.toISOString(),
       answers: activity.value.questions.map((question) => ({ questionId: question.id, optionId: answers[question.id] ?? null })),
     }), "Respostas enviadas!");
-    if (attempt) router.replace({ name: routeProps.attemptResult.name, params: { id: attempt.id } });
+    if (attempt) {
+      submitted.value = true;
+      await router.replace({ name: routeProps.attemptResult.name, params: { id: attempt.id } });
+    }
   } finally {
     submitting.value = false;
   }
@@ -151,8 +171,10 @@ const submit = async () => {
 onMounted(async () => {
   try {
     activity.value = await runOne(activityService.forAnswering(String(route.params.id)));
-    activity.value?.questions.forEach((question) => { answers[question.id] = null; });
+    if (!activity.value?.questions.length) return;
+    activity.value.questions.forEach((question) => { answers[question.id] = null; });
     startedAt.value = new Date();
+    now.value = Date.now();
     ticker = setInterval(() => { now.value = Date.now(); }, 1000);
   } finally {
     loading.value = false;

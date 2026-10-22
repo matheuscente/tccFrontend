@@ -1,14 +1,12 @@
 import { defineStore } from "pinia";
-import { api } from "@/services/api/http";
 import { refreshSession } from "@/services/api/api";
-import type { Login } from "../models/login.dto";
 import type { ApiError } from "@/services/api/models/ApiError.interface";
 import { isError } from "@/services/api/isError.typeGuard";
 import { router } from "@/router";
 import { routeProps } from "@/router/RouteProps";
 import type { UserResponseDTO } from "@/modules/user/models/DTO/UserResponseDto";
-
-const url = "/auth";
+import { userService } from "@/modules/user/services/user.service";
+import { authService } from "../services/auth.service";
 
 let loggingOut = false;
 
@@ -27,7 +25,7 @@ export const useAuthStore = defineStore("auth", {
 
   actions: {
     async login(username: string, password: string): Promise<ApiError | void> {
-      const response = await api.post<Login>(`${url}/login`, { username, password });
+      const response = await authService.login({ username, password });
 
       if (isError(response)) return response;
 
@@ -42,7 +40,7 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async loadUser(): Promise<void> {
-      const response = await api.get<UserResponseDTO>("/users/me");
+      const response = await userService.me();
       if (!isError(response)) this.user = response.data[0] ?? null;
     },
 
@@ -51,11 +49,11 @@ export const useAuthStore = defineStore("auth", {
       loggingOut = true;
 
       try {
-        if (this.token) await api.delete(`${url}/logout`);
+        if (this.token) await authService.logout();
       } finally {
         this.clearSession();
         loggingOut = false;
-        router.push({ name: routeProps.login.name });
+        await router.push({ name: routeProps.login.name });
       }
     },
 
@@ -78,7 +76,7 @@ export const useAuthStore = defineStore("auth", {
 
     isSessionExpired(): boolean {
       if (!this.expiresAt) return true;
-      // a API envia a expiração em segundos
+      // a API envia a expiração em segundos (epoch Unix)
       return Date.now() >= this.expiresAt * 1000;
     },
 

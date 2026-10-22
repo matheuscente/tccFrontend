@@ -116,12 +116,13 @@ import { isError } from "@/services/api/isError.typeGuard";
 import { splitApiErrors } from "@/utils/apiErrors";
 import { maxLength, minLength, required } from "@/utils/rules";
 import { useNotifyStore } from "@/stores/notify.store";
-import type { Scope } from "@/modules/courses/models/structure.model";
-import type { Question, QuestionType } from "../models/question.model";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import type { QuestionDTO } from "../models/DTO/QuestionDto";
+import type { QuestionType } from "../models/Types/QuestionType";
 import { questionService } from "../services/question.service";
 
-const props = defineProps<{ modelValue: boolean, question: Question | null, defaultScope?: Scope }>();
-const emit = defineEmits<{ "update:modelValue": [value: boolean], saved: [question: Question] }>();
+const props = defineProps<{ modelValue: boolean, question: QuestionDTO | null, defaultScope?: Scope }>();
+const emit = defineEmits<{ "update:modelValue": [value: boolean], saved: [question: QuestionDTO] }>();
 
 const notify = useNotifyStore();
 

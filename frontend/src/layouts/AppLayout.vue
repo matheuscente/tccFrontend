@@ -26,7 +26,7 @@
   </v-navigation-drawer>
 
   <v-app-bar flat border="b" density="comfortable">
-    <v-app-bar-nav-icon @click="toggleDrawer" aria-label="Menu" />
+    <v-app-bar-nav-icon aria-label="Alternar menu lateral" @click="toggleDrawer" />
 
     <v-app-bar-title class="text-title-medium">{{ route.meta.title }}</v-app-bar-title>
 
@@ -45,7 +45,7 @@
 
     <v-menu location="bottom end">
       <template #activator="{ props: menuProps }">
-        <v-btn v-bind="menuProps" variant="text" class="text-none mr-2" :aria-label="'Menu do usuário'">
+        <v-btn v-bind="menuProps" variant="text" class="text-none mr-2" aria-label="Menu do usuário">
           <v-avatar color="primary" variant="tonal" size="32" class="mr-sm-2">
             <span class="text-label-large">{{ initials }}</span>
           </v-avatar>
@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useDisplay, useTheme } from "vuetify";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
@@ -83,6 +83,7 @@ import { useStructureStore } from "@/stores/structure.store";
 import { useTimerStore } from "@/modules/study/stores/timer.store";
 import { routeProps } from "@/router/RouteProps";
 import { formatDuration } from "@/utils/date";
+import { writeStorage } from "@/utils/storage";
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -100,11 +101,7 @@ const isDark = computed(() => theme.global.current.value.dark);
 const toggleTheme = () => {
   const next = isDark.value ? "light" : "dark";
   theme.change(next);
-  try {
-    localStorage.setItem("theme", next);
-  } catch {
-    // storage indisponível
-  }
+  writeStorage("theme", next);
 };
 
 const toggleDrawer = () => {
@@ -176,5 +173,10 @@ onMounted(async () => {
   if (!auth.user) await auth.loadUser();
   if (auth.userId) await Promise.all([structure.load(auth.userId), timer.load()]);
   ready.value = true;
+});
+
+onBeforeUnmount(() => {
+  timer.reset();
+  structure.clear();
 });
 </script>

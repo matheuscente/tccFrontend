@@ -1,0 +1,1 @@
+export type GoalType = "DAILY_ONCE" | "DAILY_RECURRING" | "TOTAL_BY_DATE" | "TOTAL_IN_PERIOD"

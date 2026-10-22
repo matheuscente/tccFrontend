@@ -46,7 +46,7 @@ import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
 import type { VForm } from "vuetify/components";
 import AuthShell from "@/components/auth/AuthShell.vue";
-import { userService } from "@/modules/user/services/user.service";
+import { authService } from "../services/auth.service";
 import { routeProps } from "@/router/RouteProps";
 import { isError } from "@/services/api/isError.typeGuard";
 import { firstErrorMessage } from "@/utils/apiErrors";
@@ -72,7 +72,7 @@ const handleSubmit = async () => {
 
   loading.value = true;
   try {
-    const response = await userService.resetPassword(token.value, password.value);
+    const response = await authService.resetPassword(token.value, password.value);
     if (isError(response)) {
       errorMessage.value = firstErrorMessage(response);
       return;

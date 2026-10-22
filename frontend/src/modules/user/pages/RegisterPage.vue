@@ -125,7 +125,6 @@ const handleRegister = async () => {
       return;
     }
 
-    // entra direto após o cadastro
     const loginError = await authStore.login(formData.username.trim(), formData.password);
     if (loginError) {
       notify.success("Conta criada! Faça login para continuar.");

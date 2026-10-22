@@ -1,8 +1,5 @@
 import type { ApiError } from "@/services/api/models/ApiError.interface";
 
-/**
- * Separa os erros da API em erros de campo (para :error-messages) e erro geral (para alert/snackbar).
- */
 export const splitApiErrors = (error: ApiError): { fields: Record<string, string>, general: string | undefined } => {
   const fields: Record<string, string> = {};
   const general: string[] = [];

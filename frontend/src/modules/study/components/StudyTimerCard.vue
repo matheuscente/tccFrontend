@@ -61,12 +61,12 @@ import ScopeLabel from "@/components/ScopeLabel.vue";
 import { useTimerStore } from "../stores/timer.store";
 import { useStructureStore } from "@/stores/structure.store";
 import { useNotifyStore } from "@/stores/notify.store";
-import type { Scope } from "@/modules/courses/models/structure.model";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import { isError } from "@/services/api/isError.typeGuard";
 import { firstErrorMessage } from "@/utils/apiErrors";
 import { formatDateTime, formatDuration, formatMinutes } from "@/utils/date";
 
-
-const emit = defineEmits<{ finished: [] , started: [] }>();
+const emit = defineEmits<{ finished: [], started: [] }>();
 
 const timer = useTimerStore();
 const structure = useStructureStore();
@@ -99,7 +99,7 @@ const finish = async () => {
   loading.value = true;
   try {
     const result = await timer.finish();
-    if (result && "state" in result) {
+    if (isError(result)) {
       notify.error(firstErrorMessage(result));
       return;
     }

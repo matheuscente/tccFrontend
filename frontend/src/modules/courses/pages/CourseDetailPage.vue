@@ -96,11 +96,12 @@
                         icon="mdi-play"
                         color="success"
                         class="d-sm-none"
-                        aria-label="Estudar agora"
+                        :aria-label="`Estudar ${discipline.title} agora`"
+                        :loading="starting === discipline.id"
                         @click="study({ disciplineId: discipline.id }, discipline.id)"
                       />
-                      <v-btn size="small" variant="text" icon="mdi-pencil-outline" aria-label="Editar" @click="openDiscipline(module.id, discipline)" />
-                      <v-btn size="small" variant="text" icon="mdi-delete-outline" color="error" aria-label="Excluir" @click="removeDiscipline(discipline)" />
+                      <v-btn size="small" variant="text" icon="mdi-pencil-outline" :aria-label="`Editar disciplina ${discipline.title}`" @click="openDiscipline(module.id, discipline)" />
+                      <v-btn size="small" variant="text" icon="mdi-delete-outline" color="error" :aria-label="`Excluir disciplina ${discipline.title}`" @click="removeDiscipline(discipline)" />
                     </div>
                   </template>
                 </v-list-item>
@@ -116,7 +117,8 @@
       :title="dialog.title"
       :initial="dialog.initial"
       :min-title="dialog.minTitle"
-      :min-description="dialog.minTitle"
+      :min-description="dialog.minDescription"
+      :allow-clear-description="dialog.allowClearDescription"
       :save="dialog.save"
       @saved="onSaved"
     />
@@ -136,8 +138,13 @@ import { useConfirmStore } from "@/stores/confirm.store";
 import { useNotifyStore } from "@/stores/notify.store";
 import { useTimerStore } from "@/modules/study/stores/timer.store";
 import { useApi } from "@/composables/useApi";
-import { courseService, disciplineService, moduleService } from "../services/structure.service";
-import type { Discipline, Module, Scope, TitledInput } from "../models/structure.model";
+import { courseService } from "../services/course.service";
+import { moduleService } from "../services/module.service";
+import { disciplineService } from "../services/discipline.service";
+import type { DisciplineDTO } from "../models/DTO/DisciplineDto";
+import type { ModuleDTO } from "../models/DTO/ModuleDto";
+import type { TitledInputDTO } from "../models/DTO/TitledInputDto";
+import type { Scope } from "../models/interfaces/Scope.interface";
 import type { ApiResult } from "@/services/abstract/service.abstract";
 import { routeProps } from "@/router/RouteProps";
 import { formatDay } from "@/utils/date";
@@ -161,16 +168,28 @@ const course = computed(() => structure.courseById(courseId.value));
 const modules = computed(() => structure.modulesOf(courseId.value));
 const disciplineTotal = computed(() => modules.value.reduce((total, module) => total + structure.disciplinesOf(module.id).length, 0));
 
-const dialog = reactive({
+interface DialogOptions {
+  title: string
+  minTitle: number
+  minDescription: number
+  allowClearDescription: boolean
+  successMessage: string
+  initial: { title: string, description: string | null } | null
+  save: (data: TitledInputDTO) => Promise<ApiResult<unknown>>
+}
+
+const dialog = reactive<DialogOptions & { open: boolean }>({
   open: false,
   title: "",
   minTitle: 3,
+  minDescription: 3,
+  allowClearDescription: false,
   successMessage: "",
-  initial: null as { title: string, description: string | null } | null,
-  save: (() => Promise.resolve({ statusCode: 200, state: "success", data: [] })) as (data: TitledInput) => Promise<ApiResult<unknown>>,
+  initial: null,
+  save: () => Promise.resolve({ statusCode: 200, state: "success", data: [] }),
 });
 
-const openDialog = (options: { title: string, minTitle: number, successMessage: string, initial: { title: string, description: string | null } | null, save: (data: TitledInput) => Promise<ApiResult<unknown>> }) => {
+const openDialog = (options: DialogOptions) => {
   Object.assign(dialog, options);
   dialog.open = true;
 };
@@ -180,23 +199,29 @@ const openCourseEdit = () => {
   openDialog({
     title: "Editar curso",
     minTitle: 5,
+    minDescription: 5,
+    allowClearDescription: false,
     successMessage: "Curso atualizado.",
     initial: course.value,
     save: (data) => courseService.update(courseId.value, data),
   });
 };
 
-const openModule = (module: Module | null) => openDialog({
+const openModule = (module: ModuleDTO | null) => openDialog({
   title: module ? "Editar módulo" : "Novo módulo",
   minTitle: 3,
+  minDescription: 3,
+  allowClearDescription: false,
   successMessage: module ? "Módulo atualizado." : "Módulo criado.",
   initial: module,
   save: (data) => (module ? moduleService.update(module.id, data) : moduleService.create(courseId.value, data)),
 });
 
-const openDiscipline = (moduleId: string, discipline: Discipline | null) => openDialog({
+const openDiscipline = (moduleId: string, discipline: DisciplineDTO | null) => openDialog({
   title: discipline ? "Editar disciplina" : "Nova disciplina",
   minTitle: 3,
+  minDescription: 3,
+  allowClearDescription: true,
   successMessage: discipline ? "Disciplina atualizada." : "Disciplina criada.",
   initial: discipline,
   save: (data) => (discipline ? disciplineService.update(discipline.id, data) : disciplineService.create(moduleId, data)),
@@ -207,7 +232,7 @@ const onSaved = async () => {
   await structure.reload();
 };
 
-const removeModule = async (module: Module) => {
+const removeModule = async (module: ModuleDTO) => {
   const ok = await confirm.ask({
     title: "Excluir módulo",
     message: `Excluir "${module.title}"?\n\nAs disciplinas, metas, sessões de estudo, questões e atividades deste módulo também serão removidas.`,
@@ -217,7 +242,7 @@ const removeModule = async (module: Module) => {
   if (await run(moduleService.remove(module.id), "Módulo excluído.")) await structure.reload();
 };
 
-const removeDiscipline = async (discipline: Discipline) => {
+const removeDiscipline = async (discipline: DisciplineDTO) => {
   const ok = await confirm.ask({
     title: "Excluir disciplina",
     message: `Excluir "${discipline.title}"?\n\nAs metas, sessões de estudo, questões e atividades desta disciplina também serão removidas.`,
@@ -249,7 +274,6 @@ const study = async (scope: Scope, key: string) => {
 
 onMounted(async () => {
   await structure.load(auth.userId);
-  // garante dados atualizados (ex.: acesso direto pela URL)
   if (!course.value) await structure.reload();
   loading.value = false;
   if (modules.value.length === 1) openPanels.value = [modules.value[0]!.id];

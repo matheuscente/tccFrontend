@@ -25,7 +25,12 @@
     <v-list v-else density="compact" class="picker-list border rounded-lg">
       <v-list-item v-for="question in filtered" :key="question.id" @click="toggle(question.id)">
         <template #prepend>
-          <v-checkbox-btn :model-value="modelValue.includes(question.id)" color="primary" @click.stop="toggle(question.id)" />
+          <v-checkbox-btn
+            :model-value="modelValue.includes(question.id)"
+            color="primary"
+            :aria-label="`Selecionar questão: ${question.statement}`"
+            @click.stop="toggle(question.id)"
+          />
         </template>
         <v-list-item-title class="text-wrap text-body-medium">{{ question.statement }}</v-list-item-title>
         <v-list-item-subtitle>
@@ -42,11 +47,11 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
-import type { Question } from "@/modules/questions/models/question.model";
+import type { QuestionDTO } from "@/modules/questions/models/DTO/QuestionDto";
 
 const props = withDefaults(defineProps<{
   modelValue: string[]
-  questions: Question[]
+  questions: QuestionDTO[]
   loading?: boolean
   emptyText?: string
 }>(), { loading: false, emptyText: "Nenhuma questão disponível neste escopo. Cadastre questões no banco de questões." });

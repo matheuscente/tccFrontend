@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import PageHeader from "@/components/PageHeader.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import ScopeSelect from "@/components/ScopeSelect.vue";
@@ -99,32 +99,36 @@ import ScopeLabel from "@/components/ScopeLabel.vue";
 import { useApi } from "@/composables/useApi";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useConfirmStore } from "@/stores/confirm.store";
-import type { Scope } from "@/modules/courses/models/structure.model";
-import { questionTypeLabels, type Question } from "../models/question.model";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import { useLatest } from "@/composables/useLatest";
+import { questionTypeLabels } from "../models/constants/question.constants";
+import type { QuestionDTO } from "../models/DTO/QuestionDto";
 import { questionService } from "../services/question.service";
 import QuestionFormDialog from "../components/QuestionFormDialog.vue";
 
 const auth = useAuthStore();
 const confirm = useConfirmStore();
 const { run } = useApi();
+const latest = useLatest();
 
-const questions = ref<Question[]>([]);
+const questions = ref<QuestionDTO[]>([]);
 const loading = ref(false);
 const filterScope = ref<Scope>({});
 const search = ref<string | null>("");
 const dialog = ref(false);
-const editing = ref<Question | null>(null);
+const editing = ref<QuestionDTO | null>(null);
 
 const hasFilter = computed(() => !!(search.value || filterScope.value.courseId || filterScope.value.moduleId || filterScope.value.disciplineId));
 
 const load = async () => {
   if (!auth.userId) return;
+  const request = latest.next();
   loading.value = true;
   try {
     const data = await run(questionService.listByUser(auth.userId, { ...filterScope.value, search: search.value?.trim() || undefined }));
-    questions.value = data ?? [];
+    if (latest.isLatest(request)) questions.value = data ?? [];
   } finally {
-    loading.value = false;
+    if (latest.isLatest(request)) loading.value = false;
   }
 };
 
@@ -140,12 +144,12 @@ const openCreate = () => {
   dialog.value = true;
 };
 
-const openEdit = (question: Question) => {
+const openEdit = (question: QuestionDTO) => {
   editing.value = question;
   dialog.value = true;
 };
 
-const remove = async (question: Question) => {
+const remove = async (question: QuestionDTO) => {
   const ok = await confirm.ask({
     title: "Excluir questão",
     message: "A questão será removida do banco e das atividades em que aparece. Deseja continuar?",
@@ -157,6 +161,8 @@ const remove = async (question: Question) => {
 };
 
 onMounted(load);
+
+onBeforeUnmount(() => clearTimeout(timeout));
 </script>
 
 <style scoped>

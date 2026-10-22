@@ -1,5 +1,5 @@
 <template>
-  <v-snackbar v-model="notify.visible" :color="notify.color" timeout="4000" location="bottom right" multi-line>
+  <v-snackbar v-model="notify.visible" :color="notify.color" timeout="4000" location="bottom right">
     <span class="multi-line">{{ notify.message }}</span>
     <template #actions>
       <v-btn variant="text" icon="mdi-close" aria-label="Fechar" @click="notify.visible = false" />

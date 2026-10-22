@@ -1,8 +1,6 @@
 const routeProps = {
-
     notFound: { name: "NotFound", path: "/:pathMatch(.*)*", title: "Página não encontrada" },
 
-    // páginas públicas
     login: { name: "Login", path: "/login", title: "Login" },
     register: { name: "Register", path: "/signin", title: "Cadastre-se" },
     forgotPassword: { name: "ForgotPassword", path: "/forgot-password", title: "Esqueci minha senha" },
@@ -10,7 +8,6 @@ const routeProps = {
 
     index: { path: "/", redirect: "/dashboard" },
 
-    // área do estudante
     home: { name: "home", path: "/dashboard", title: "Início" },
     courses: { name: "Courses", path: "/courses", title: "Cursos" },
     courseDetail: { name: "CourseDetail", path: "/courses/:id", title: "Curso" },
@@ -28,7 +25,6 @@ const routeProps = {
     ticketDetail: { name: "TicketDetail", path: "/support/:id", title: "Chamado" },
     profile: { name: "Profile", path: "/profile", title: "Meu perfil" },
 
-    // painel administrativo
     adminDashboard: { name: "AdminDashboard", path: "/admin", title: "Painel administrativo" },
     adminUsers: { name: "AdminUsers", path: "/admin/users", title: "Usuários" },
     adminUserDetail: { name: "AdminUserDetail", path: "/admin/users/:id", title: "Acompanhamento do usuário" },

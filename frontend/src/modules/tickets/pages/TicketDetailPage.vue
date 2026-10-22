@@ -66,17 +66,16 @@
               </div>
               <div class="text-body-medium pre-wrap">{{ message.content }}</div>
               <div v-if="message.attachments.length" class="d-flex flex-wrap ga-2 mt-3">
-                <v-img
+                <button
                   v-for="attachment in message.attachments"
                   :key="attachment.id"
-                  :src="attachment.url"
-                  :alt="attachment.originalName"
-                  width="96"
-                  height="96"
-                  cover
-                  class="rounded-lg cursor-pointer attachment"
+                  type="button"
+                  class="attachment-button"
+                  :aria-label="`Ampliar imagem ${attachment.originalName}`"
                   @click="preview = attachment"
-                />
+                >
+                  <v-img :src="attachment.url" :alt="attachment.originalName" width="96" height="96" cover class="rounded-lg attachment" />
+                </button>
               </div>
             </div>
           </div>
@@ -118,7 +117,7 @@
           <v-btn icon="mdi-open-in-new" variant="text" :href="preview.url" target="_blank" rel="noopener" aria-label="Abrir em nova aba" />
           <v-btn icon="mdi-close" variant="text" aria-label="Fechar" @click="preview = null" />
         </v-card-title>
-        <v-img :src="preview.url" max-height="75vh" contain />
+        <v-img :src="preview.url" :alt="preview.originalName" max-height="75vh" />
       </v-card>
     </v-dialog>
   </div>
@@ -138,10 +137,9 @@ import { formatDateTime } from "@/utils/date";
 import { maxLength, minLength, required } from "@/utils/rules";
 import ImagePicker from "../components/ImagePicker.vue";
 import { ticketService } from "../services/ticket.service";
-import {
-  ticketCategoryLabels, ticketStatusInfo,
-  type TicketAttachment, type TicketDetail, type TicketMessage, type TicketStatus,
-} from "../models/ticket.model";
+import { ticketCategoryLabels, ticketStatusInfo } from "../models/constants/ticket.constants";
+import type { TicketAttachmentDTO, TicketDetailDTO, TicketMessageDTO } from "../models/DTO/TicketDetailDto";
+import type { TicketStatus } from "../models/Types/TicketStatus";
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -151,19 +149,19 @@ const { runOne } = useApi();
 const adminMode = computed(() => route.meta.adminMode === true);
 const ticketId = computed(() => String(route.params.id));
 
-const ticket = ref<TicketDetail | null>(null);
+const ticket = ref<TicketDetailDTO | null>(null);
 const loading = ref(false);
 const changingStatus = ref(false);
 const sending = ref(false);
 const reply = ref("");
 const images = ref<File[]>([]);
 const form = ref<VForm | null>(null);
-const preview = ref<TicketAttachment | null>(null);
+const preview = ref<TicketAttachmentDTO | null>(null);
 
 const statusItems = (Object.keys(ticketStatusInfo) as TicketStatus[]).map((value) => ({ value, title: ticketStatusInfo[value].label }));
 
-const isSupport = (message: TicketMessage) => message.author.role === "ADMIN" && message.author.id !== ticket.value?.user.id;
-const isOwn = (message: TicketMessage) => message.author.id === auth.userId;
+const isSupport = (message: TicketMessageDTO) => message.author.role === "ADMIN" && message.author.id !== ticket.value?.user.id;
+const isOwn = (message: TicketMessageDTO) => message.author.id === auth.userId;
 
 const load = async () => {
   loading.value = true;
@@ -249,5 +247,13 @@ onMounted(load);
 
 .attachment {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.attachment-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
 }
 </style>

@@ -1,18 +1,16 @@
 import { defineStore } from "pinia";
 import { isError } from "@/services/api/isError.typeGuard";
-import { studySessionService } from "../services/study-session.service";
-import type { StudySession } from "../models/study-session.model";
-import type { Scope } from "@/modules/courses/models/structure.model";
 import type { ApiError } from "@/services/api/models/ApiError.interface";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import { studySessionService } from "../services/study-session.service";
+import type { StudySessionDTO } from "../models/DTO/StudySessionDto";
 
-/**
- * Sessão de estudo em andamento (cronômetro). Fica no store para aparecer no topo de todas as telas.
- */
+let interval: ReturnType<typeof setInterval> | null = null;
+
 export const useTimerStore = defineStore("timer", {
   state: () => ({
-    active: null as StudySession | null,
+    active: null as StudySessionDTO | null,
     now: Date.now(),
-    interval: null as ReturnType<typeof setInterval> | null,
   }),
 
   getters: {
@@ -32,7 +30,7 @@ export const useTimerStore = defineStore("timer", {
       return null;
     },
 
-    async finish(): Promise<StudySession | ApiError | null> {
+    async finish(): Promise<StudySessionDTO | ApiError | null> {
       if (!this.active) return null;
       const response = await studySessionService.finish(this.active.id);
       if (isError(response)) return response;
@@ -40,14 +38,14 @@ export const useTimerStore = defineStore("timer", {
       return response.data[0] ?? null;
     },
 
-    setActive(session: StudySession | null) {
+    setActive(session: StudySessionDTO | null) {
       this.active = session;
-      if (session && !this.interval) {
-        this.interval = setInterval(() => { this.now = Date.now(); }, 1000);
+      if (session && !interval) {
+        interval = setInterval(() => { this.now = Date.now(); }, 1000);
       }
-      if (!session && this.interval) {
-        clearInterval(this.interval);
-        this.interval = null;
+      if (!session && interval) {
+        clearInterval(interval);
+        interval = null;
       }
       this.now = Date.now();
     },

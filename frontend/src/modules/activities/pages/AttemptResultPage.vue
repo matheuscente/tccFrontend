@@ -67,14 +67,14 @@ import EmptyState from "@/components/EmptyState.vue";
 import { useApi } from "@/composables/useApi";
 import { routeProps } from "@/router/RouteProps";
 import { formatDateTime, formatDuration } from "@/utils/date";
-import type { Attempt } from "../models/activity.model";
+import { formatScore, scoreColor } from "@/utils/score";
+import type { AttemptDTO } from "../models/DTO/AttemptDto";
 import { activityService } from "../services/activity.service";
-import { formatScore, scoreColor } from "../components/scoreColor";
 
 const route = useRoute();
 const { runOne } = useApi();
 
-const attempt = ref<Attempt | null>(null);
+const attempt = ref<AttemptDTO | null>(null);
 const loading = ref(true);
 
 const message = computed(() => {

@@ -46,7 +46,7 @@
             <template #append>
               <v-menu location="bottom end">
                 <template #activator="{ props: menuProps }">
-                  <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" aria-label="Ações" @click.prevent />
+                  <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" :aria-label="`Ações do curso ${course.title}`" @click.prevent />
                 </template>
                 <v-list density="compact">
                   <v-list-item prepend-icon="mdi-pencil-outline" title="Editar" @click="openEdit(course)" />
@@ -97,8 +97,9 @@ import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useConfirmStore } from "@/stores/confirm.store";
 import { useNotifyStore } from "@/stores/notify.store";
 import { useApi } from "@/composables/useApi";
-import { courseService } from "../services/structure.service";
-import type { Course, TitledInput } from "../models/structure.model";
+import { courseService } from "../services/course.service";
+import type { CourseDTO } from "../models/DTO/CourseDto";
+import type { TitledInputDTO } from "../models/DTO/TitledInputDto";
 import { routeProps } from "@/router/RouteProps";
 import { formatDay } from "@/utils/date";
 
@@ -110,7 +111,7 @@ const { run } = useApi();
 
 const search = ref("");
 const dialog = ref(false);
-const editing = ref<Course | null>(null);
+const editing = ref<CourseDTO | null>(null);
 
 const filtered = computed(() => {
   const term = (search.value ?? "").trim().toLowerCase();
@@ -125,12 +126,12 @@ const openCreate = () => {
   dialog.value = true;
 };
 
-const openEdit = (course: Course) => {
+const openEdit = (course: CourseDTO) => {
   editing.value = course;
   dialog.value = true;
 };
 
-const save = (data: TitledInput) =>
+const save = (data: TitledInputDTO) =>
   editing.value ? courseService.update(editing.value.id, data) : courseService.create(auth.userId, data);
 
 const onSaved = async () => {
@@ -138,7 +139,7 @@ const onSaved = async () => {
   await structure.reload();
 };
 
-const remove = async (course: Course) => {
+const remove = async (course: CourseDTO) => {
   const ok = await confirm.ask({
     title: "Excluir curso",
     message: `Excluir "${course.title}"?\n\nTambém serão removidos os módulos, disciplinas, metas, sessões de estudo, questões e atividades ligados a este curso.`,

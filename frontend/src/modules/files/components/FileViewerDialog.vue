@@ -49,57 +49,73 @@
 import { computed, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { isError } from "@/services/api/isError.typeGuard";
+import { useLatest } from "@/composables/useLatest";
 import { firstErrorMessage } from "@/utils/apiErrors";
 import { formatBytes } from "@/utils/date";
-import { fileIcon, fileKind, type FileAccess, type StoredFile } from "../models/file.model";
+import { TEXT_PREVIEW_LIMIT } from "../models/constants/file.constants";
+import type { FileAccessDTO } from "../models/DTO/FileAccessDto";
+import type { StoredFileDTO } from "../models/DTO/StoredFileDto";
 import { fileService } from "../services/file.service";
+import { fileIcon, fileKind } from "../utils/fileKind";
 
-const props = defineProps<{ modelValue: boolean, file: StoredFile | null }>();
+const props = defineProps<{ modelValue: boolean, file: StoredFileDTO | null }>();
 const emit = defineEmits<{ "update:modelValue": [value: boolean] }>();
 
 const { mobile } = useDisplay();
 
-const access = ref<FileAccess | null>(null);
+const access = ref<FileAccessDTO | null>(null);
 const loading = ref(false);
 const error = ref<string>();
 const textContent = ref("");
 
 const kind = computed(() => (props.file ? fileKind(props.file.mimeType) : "other"));
 
-const TEXT_LIMIT = 2 * 1024 * 1024;
+const latest = useLatest();
 
 const open = async () => {
-  if (!props.file) return;
+  const file = props.file;
+  if (!file) return;
+  const request = latest.next();
   access.value = null;
   error.value = undefined;
   textContent.value = "";
   loading.value = true;
   try {
-    const response = await fileService.access(props.file.id);
+    const response = await fileService.access(file.id);
+    if (!latest.isLatest(request)) return;
     if (isError(response)) {
       error.value = firstErrorMessage(response);
       return;
     }
-    access.value = response.data[0] ?? null;
+    const granted = response.data[0] ?? null;
 
-    if (access.value && kind.value === "text") {
-      if (props.file.size > TEXT_LIMIT) {
+    if (granted && fileKind(file.mimeType) === "text") {
+      if (file.size > TEXT_PREVIEW_LIMIT) {
         textContent.value = "Arquivo grande demais para pré-visualizar. Use o botão de download.";
       } else {
-        const result = await fetch(access.value.viewUrl);
-        textContent.value = result.ok ? await result.text() : "Não foi possível carregar o conteúdo.";
+        const result = await fetch(granted.viewUrl);
+        const text = result.ok ? await result.text() : "Não foi possível carregar o conteúdo.";
+        if (!latest.isLatest(request)) return;
+        textContent.value = text;
       }
     }
+    access.value = granted;
   } catch {
-    error.value = "Não foi possível abrir o arquivo.";
+    if (latest.isLatest(request)) error.value = "Não foi possível abrir o arquivo.";
   } finally {
-    loading.value = false;
+    if (latest.isLatest(request)) loading.value = false;
   }
 };
 
+// ao fechar, remove a mídia do DOM: o v-dialog mantém o conteúdo montado e o vídeo/áudio continuaria tocando
 watch(() => [props.modelValue, props.file?.id], ([visible]) => {
-  if (visible) void open();
-  else access.value = null;
+  if (visible) {
+    void open();
+    return;
+  }
+  latest.next();
+  access.value = null;
+  loading.value = false;
 });
 </script>
 

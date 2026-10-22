@@ -47,7 +47,7 @@
               size="small"
               variant="text"
               :to="{ name: routeProps.adminUserDetail.name, params: { id: item.id } }"
-              aria-label="Ver acompanhamento"
+:aria-label="`Ver acompanhamento de ${item.name}`"
               v-tooltip="'Ver acompanhamento'"
             />
             <v-btn
@@ -56,7 +56,7 @@
               variant="text"
               :disabled="item.id === auth.userId"
               :loading="changingId === item.id"
-              :aria-label="item.role === 'ADMIN' ? 'Remover administrador' : 'Tornar administrador'"
+              :aria-label="`${item.role === 'ADMIN' ? 'Remover administrador' : 'Tornar administrador'}: ${item.name}`"
               v-tooltip="item.id === auth.userId ? 'Você não pode alterar o próprio perfil' : (item.role === 'ADMIN' ? 'Remover administrador' : 'Tornar administrador')"
               @click="toggleRole(item)"
             />
@@ -68,9 +68,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { useApi } from "@/composables/useApi";
+import { useLatest } from "@/composables/useLatest";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useConfirmStore } from "@/stores/confirm.store";
 import { routeProps } from "@/router/RouteProps";
@@ -81,6 +82,7 @@ import { adminService } from "../services/admin.service";
 const auth = useAuthStore();
 const confirm = useConfirmStore();
 const { runOne } = useApi();
+const latest = useLatest();
 
 const headers = [
   { title: "Nome", key: "name", sortable: false },
@@ -99,6 +101,7 @@ const loading = ref(false);
 const changingId = ref<string | null>(null);
 
 const load = async () => {
+  const request = latest.next();
   loading.value = true;
   try {
     const result = await runOne(adminService.listUsers({
@@ -106,10 +109,11 @@ const load = async () => {
       page: page.value,
       pageSize: pageSize.value,
     }));
+    if (!latest.isLatest(request)) return;
     users.value = result?.items ?? [];
     total.value = result?.total ?? 0;
   } finally {
-    loading.value = false;
+    if (latest.isLatest(request)) loading.value = false;
   }
 };
 
@@ -117,10 +121,13 @@ let debounce: ReturnType<typeof setTimeout> | undefined;
 watch(search, () => {
   clearTimeout(debounce);
   debounce = setTimeout(() => {
-    if (page.value !== 1) page.value = 1; // a troca de página dispara o load
+    // voltar para a página 1 já dispara o load via update:options
+    if (page.value !== 1) page.value = 1;
     else load();
   }, 400);
 });
+
+onBeforeUnmount(() => clearTimeout(debounce));
 
 const toggleRole = async (user: UserResponseDTO) => {
   const toAdmin = user.role !== "ADMIN";

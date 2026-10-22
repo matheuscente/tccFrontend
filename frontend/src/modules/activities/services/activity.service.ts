@@ -1,15 +1,59 @@
 import { api } from "@/services/api/http";
-import type { Activity, ActivityDetail, ActivityForAnswering, Attempt, CreateActivityInput, SubmitAttemptInput } from "../models/activity.model";
+import type { Service } from "@/services/abstract/service.abstract";
+import type { ActivityDetailDTO, ActivityDTO } from "../models/DTO/ActivityDto";
+import type { ActivityForAnsweringDTO } from "../models/DTO/ActivityForAnsweringDto";
+import type { AttemptDTO } from "../models/DTO/AttemptDto";
+import type { CreateActivityDTO } from "../models/DTO/CreateActivityDto";
+import type { SubmitAttemptDTO } from "../models/DTO/SubmitAttemptDto";
+import type { UpdateActivityDTO } from "../models/DTO/UpdateActivityDto";
+import type { ActivityServiceInterface } from "../models/interfaces/ActivityService.interface";
 
-export const activityService = {
-  listByUser: (userId: string) => api.get<Activity>(`/activities/user/${userId}`),
-  findById: (id: string) => api.get<ActivityDetail>(`/activities/id/${id}`),
-  create: (data: CreateActivityInput) => api.post<ActivityDetail>("/activities", data),
-  update: (id: string, data: { title?: string, description?: string | null }) => api.patch<ActivityDetail>(`/activities/${id}`, data),
-  setQuestions: (id: string, questionIds: string[]) => api.put<ActivityDetail>(`/activities/${id}/questions`, { questionIds }),
-  remove: (id: string) => api.delete(`/activities/${id}`),
-  forAnswering: (id: string) => api.get<ActivityForAnswering>(`/activities/${id}/answer`),
-  submit: (id: string, data: SubmitAttemptInput) => api.post<Attempt>(`/activities/${id}/attempts`, data),
-  attempts: (id: string) => api.get<Attempt>(`/activities/${id}/attempts`),
-  attempt: (attemptId: string) => api.get<Attempt>(`/activities/attempts/${attemptId}`),
-};
+export class ActivityService implements ActivityServiceInterface {
+  private readonly api: Service;
+
+  constructor(api: Service) {
+    this.api = api;
+  }
+
+  listByUser(userId: string) {
+    return this.api.get<ActivityDTO>(`/activities/user/${userId}`);
+  }
+
+  findById(id: string) {
+    return this.api.get<ActivityDetailDTO>(`/activities/id/${id}`);
+  }
+
+  create(data: CreateActivityDTO) {
+    return this.api.post<ActivityDetailDTO>("/activities", data);
+  }
+
+  update(id: string, data: UpdateActivityDTO) {
+    return this.api.patch<ActivityDetailDTO>(`/activities/${id}`, data);
+  }
+
+  setQuestions(id: string, questionIds: string[]) {
+    return this.api.put<ActivityDetailDTO>(`/activities/${id}/questions`, { questionIds });
+  }
+
+  remove(id: string) {
+    return this.api.delete<unknown>(`/activities/${id}`);
+  }
+
+  forAnswering(id: string) {
+    return this.api.get<ActivityForAnsweringDTO>(`/activities/${id}/answer`);
+  }
+
+  submit(id: string, data: SubmitAttemptDTO) {
+    return this.api.post<AttemptDTO>(`/activities/${id}/attempts`, data);
+  }
+
+  attempts(id: string) {
+    return this.api.get<AttemptDTO>(`/activities/${id}/attempts`);
+  }
+
+  attempt(attemptId: string) {
+    return this.api.get<AttemptDTO>(`/activities/attempts/${attemptId}`);
+  }
+}
+
+export const activityService = new ActivityService(api);

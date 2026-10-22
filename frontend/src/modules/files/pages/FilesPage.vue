@@ -14,8 +14,10 @@
           :class="{ 'dropzone--active': dragging }"
           role="button"
           tabindex="0"
+          aria-label="Selecionar arquivos para enviar"
           @click="fileInput?.click()"
-          @keydown.enter="fileInput?.click()"
+          @keydown.enter.prevent="fileInput?.click()"
+          @keydown.space.prevent="fileInput?.click()"
           @dragover.prevent="dragging = true"
           @dragleave.prevent="dragging = false"
           @drop.prevent="onDrop"
@@ -72,7 +74,14 @@
           <tbody>
             <tr v-for="file in files" :key="file.id">
               <td>
-                <div class="d-flex align-center ga-2 cursor-pointer" @click="view(file)">
+                <div
+                  class="d-flex align-center ga-2 cursor-pointer"
+                  role="button"
+                  tabindex="0"
+                  @click="view(file)"
+                  @keydown.enter.prevent="view(file)"
+                  @keydown.space.prevent="view(file)"
+                >
                   <v-icon :icon="fileIcon(file.mimeType)" color="primary" />
                   <span class="text-body-medium file-name">{{ file.originalName }}</span>
                 </div>
@@ -81,11 +90,11 @@
               <td class="d-none d-sm-table-cell text-no-wrap">{{ formatBytes(file.size) }}</td>
               <td class="d-none d-sm-table-cell text-no-wrap">{{ formatDateTime(file.createdAt) }}</td>
               <td class="text-right text-no-wrap">
-                <v-btn icon="mdi-eye-outline" variant="text" size="small" aria-label="Visualizar" @click="view(file)" />
-                <v-btn icon="mdi-download" variant="text" size="small" aria-label="Baixar" :loading="downloading === file.id" @click="download(file)" />
+                <v-btn icon="mdi-eye-outline" variant="text" size="small" :aria-label="`Visualizar ${file.originalName}`" @click="view(file)" />
+                <v-btn icon="mdi-download" variant="text" size="small" :aria-label="`Baixar ${file.originalName}`" :loading="downloading === file.id" @click="download(file)" />
                 <v-menu>
                   <template #activator="{ props: menuProps }">
-                    <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" aria-label="Mais ações" />
+                    <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" :aria-label="`Mais ações para ${file.originalName}`" />
                   </template>
                   <v-list density="compact">
                     <v-list-item prepend-icon="mdi-pencil-outline" title="Renomear / vincular" @click="openEdit(file)" />
@@ -125,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { VForm } from "vuetify/components";
 import PageHeader from "@/components/PageHeader.vue";
 import EmptyState from "@/components/EmptyState.vue";
@@ -139,19 +148,21 @@ import { isError } from "@/services/api/isError.typeGuard";
 import { firstErrorMessage } from "@/utils/apiErrors";
 import { formatBytes, formatDateTime } from "@/utils/date";
 import { maxLength, required } from "@/utils/rules";
-import type { Scope } from "@/modules/courses/models/structure.model";
-import { fileIcon, type StoredFile } from "../models/file.model";
+import { useLatest } from "@/composables/useLatest";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import { MAX_UPLOAD_SIZE } from "../models/constants/file.constants";
+import type { StoredFileDTO } from "../models/DTO/StoredFileDto";
 import { fileService } from "../services/file.service";
+import { fileIcon } from "../utils/fileKind";
 import FileViewerDialog from "../components/FileViewerDialog.vue";
-
-const MAX_SIZE = 100 * 1024 * 1024;
 
 const auth = useAuthStore();
 const confirm = useConfirmStore();
 const notify = useNotifyStore();
 const { run, runOne } = useApi();
+const latest = useLatest();
 
-const files = ref<StoredFile[]>([]);
+const files = ref<StoredFileDTO[]>([]);
 const loading = ref(false);
 const filterScope = ref<Scope>({});
 const search = ref<string | null>("");
@@ -165,32 +176,35 @@ const queue = ref<QueueItem[]>([]);
 let uploading = false;
 
 const viewerOpen = ref(false);
-const viewing = ref<StoredFile | null>(null);
+const viewing = ref<StoredFileDTO | null>(null);
 const downloading = ref<string | null>(null);
 
 const editOpen = ref(false);
 const editForm = ref<VForm | null>(null);
-const editing = ref<StoredFile | null>(null);
+const editing = ref<StoredFileDTO | null>(null);
 const editName = ref("");
 const editScope = ref<Scope>({});
 const savingEdit = ref(false);
 
 const totalSize = computed(() => files.value.reduce((sum, file) => sum + file.size, 0));
 
-const scopeOf = (file: StoredFile): Scope =>
+const scopeOf = (file: StoredFileDTO): Scope =>
   file.disciplineId ? { disciplineId: file.disciplineId } : file.moduleId ? { moduleId: file.moduleId } : file.courseId ? { courseId: file.courseId } : {};
 
 const load = async () => {
   if (!auth.userId) return;
+  const request = latest.next();
   loading.value = true;
   try {
-    files.value = (await run(fileService.listByUser(auth.userId, { ...filterScope.value, search: search.value?.trim() || undefined }))) ?? [];
+    const data = await run(fileService.listByUser(auth.userId, { ...filterScope.value, search: search.value?.trim() || undefined }));
+    if (latest.isLatest(request)) files.value = data ?? [];
   } finally {
-    loading.value = false;
+    if (latest.isLatest(request)) loading.value = false;
   }
 };
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
 watch(search, () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(load, 400);
@@ -204,8 +218,8 @@ const enqueue = (list: FileList | null | undefined) => {
       key: `${file.name}-${file.size}-${Math.random()}`,
       file,
       progress: 0,
-      status: file.size > MAX_SIZE ? "error" : "waiting",
-      ...(file.size > MAX_SIZE ? { error: "Arquivo maior que 100 MB" } : {}),
+      status: file.size > MAX_UPLOAD_SIZE ? "error" : "waiting",
+      ...(file.size > MAX_UPLOAD_SIZE ? { error: "Arquivo maior que 100 MB" } : {}),
     });
   });
   void processQueue();
@@ -222,22 +236,23 @@ const onDrop = (event: DragEvent) => {
   enqueue(event.dataTransfer?.files);
 };
 
-// envia um arquivo por vez
+// um envio por vez; busca o próximo a cada volta porque a fila pode ser substituída durante o envio
 const processQueue = async () => {
   if (uploading) return;
   uploading = true;
   let uploaded = 0;
   try {
-    for (const item of queue.value) {
-      if (item.status !== "waiting") continue;
-      item.status = "uploading";
-      const response = await fileService.upload(item.file, uploadScope.value, (percent) => { item.progress = percent; });
+    let item: QueueItem | undefined;
+    while ((item = queue.value.find((entry) => entry.status === "waiting"))) {
+      const current = item;
+      current.status = "uploading";
+      const response = await fileService.upload(current.file, uploadScope.value, (percent) => { current.progress = percent; });
       if (isError(response)) {
-        item.status = "error";
-        item.error = firstErrorMessage(response);
+        current.status = "error";
+        current.error = firstErrorMessage(response);
       } else {
-        item.status = "done";
-        item.progress = 100;
+        current.status = "done";
+        current.progress = 100;
         uploaded++;
       }
     }
@@ -247,16 +262,17 @@ const processQueue = async () => {
   if (uploaded) {
     notify.success(uploaded === 1 ? "Arquivo enviado." : `${uploaded} arquivos enviados.`);
     await load();
-    setTimeout(() => { queue.value = queue.value.filter((item) => item.status !== "done"); }, 3000);
+    clearTimeout(cleanupTimer);
+    cleanupTimer = setTimeout(() => { queue.value = queue.value.filter((entry) => entry.status !== "done"); }, 3000);
   }
 };
 
-const view = (file: StoredFile) => {
+const view = (file: StoredFileDTO) => {
   viewing.value = file;
   viewerOpen.value = true;
 };
 
-const download = async (file: StoredFile) => {
+const download = async (file: StoredFileDTO) => {
   downloading.value = file.id;
   try {
     const access = await runOne(fileService.access(file.id));
@@ -272,7 +288,7 @@ const download = async (file: StoredFile) => {
   }
 };
 
-const openEdit = (file: StoredFile) => {
+const openEdit = (file: StoredFileDTO) => {
   editing.value = file;
   editName.value = file.originalName;
   editScope.value = scopeOf(file);
@@ -300,13 +316,18 @@ const saveEdit = async () => {
   }
 };
 
-const remove = async (file: StoredFile) => {
+const remove = async (file: StoredFileDTO) => {
   const ok = await confirm.ask({ title: "Excluir arquivo", message: `Excluir "${file.originalName}" definitivamente?`, confirmText: "Excluir" });
   if (!ok) return;
   if (await run(fileService.remove(file.id), "Arquivo excluído.")) await load();
 };
 
 onMounted(load);
+
+onBeforeUnmount(() => {
+  clearTimeout(searchTimer);
+  clearTimeout(cleanupTimer);
+});
 </script>
 
 <style scoped>

@@ -1,18 +1,23 @@
 import { defineStore } from "pinia";
 import { isError } from "@/services/api/isError.typeGuard";
-import { courseService, disciplineService, moduleService } from "@/modules/courses/services/structure.service";
-import type { Course, Discipline, Module, Scope, ScopeLevel } from "@/modules/courses/models/structure.model";
+import { firstErrorMessage } from "@/utils/apiErrors";
+import { useNotifyStore } from "./notify.store";
+import { courseService } from "@/modules/courses/services/course.service";
+import { moduleService } from "@/modules/courses/services/module.service";
+import { disciplineService } from "@/modules/courses/services/discipline.service";
+import type { CourseDTO } from "@/modules/courses/models/DTO/CourseDto";
+import type { ModuleDTO } from "@/modules/courses/models/DTO/ModuleDto";
+import type { DisciplineDTO } from "@/modules/courses/models/DTO/DisciplineDto";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import type { ScopeLevel } from "@/modules/courses/models/Types/ScopeLevel";
 
-/**
- * Cache da estrutura curso > módulo > disciplina do usuário logado.
- * Usado pelos seletores de escopo e para exibir os nomes nas listas.
- */
 export const useStructureStore = defineStore("structure", {
   state: () => ({
-    courses: [] as Course[],
-    modules: [] as Module[],
-    disciplines: [] as Discipline[],
+    courses: [] as CourseDTO[],
+    modules: [] as ModuleDTO[],
+    disciplines: [] as DisciplineDTO[],
     loadedFor: null as string | null,
+    requestedFor: null as string | null,
     loading: false,
   }),
 
@@ -28,6 +33,7 @@ export const useStructureStore = defineStore("structure", {
     async load(userId: string, force = false) {
       if (!userId || (!force && this.loadedFor === userId)) return;
 
+      this.requestedFor = userId;
       this.loading = true;
       try {
         const [courses, modules, disciplines] = await Promise.all([
@@ -39,6 +45,13 @@ export const useStructureStore = defineStore("structure", {
         this.courses = isError(courses) ? [] : courses.data;
         this.modules = isError(modules) ? [] : modules.data;
         this.disciplines = isError(disciplines) ? [] : disciplines.data;
+
+        const error = [courses, modules, disciplines].find(isError);
+        if (error) {
+          this.loadedFor = null;
+          useNotifyStore().error(firstErrorMessage(error));
+          return;
+        }
         this.loadedFor = userId;
       } finally {
         this.loading = false;
@@ -46,7 +59,7 @@ export const useStructureStore = defineStore("structure", {
     },
 
     reload() {
-      if (this.loadedFor) return this.load(this.loadedFor, true);
+      if (this.requestedFor) return this.load(this.requestedFor, true);
     },
 
     clear() {
@@ -54,9 +67,9 @@ export const useStructureStore = defineStore("structure", {
       this.modules = [];
       this.disciplines = [];
       this.loadedFor = null;
+      this.requestedFor = null;
     },
 
-    /** Nível e caminho legível de um escopo, ex.: "Curso › Módulo › Disciplina". */
     describe(scope: Scope): { level: ScopeLevel | null, path: string[] } {
       if (scope.disciplineId) {
         const discipline = this.disciplineById(scope.disciplineId);

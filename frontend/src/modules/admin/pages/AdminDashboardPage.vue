@@ -26,7 +26,7 @@
           <StatCard
             label="Tentativas (30 dias)"
             :value="data.activities.attemptsLast30Days"
-            :caption="data.activities.averageScoreLast30Days !== null ? `média ${data.activities.averageScoreLast30Days}%` : 'sem tentativas'"
+            :caption="data.activities.averageScoreLast30Days !== null ? `média ${formatScore(data.activities.averageScoreLast30Days)}` : 'sem tentativas'"
             icon="mdi-clipboard-check-outline"
             color="warning"
           />
@@ -87,11 +87,11 @@
             <v-card-text>
               <v-row density="compact">
                 <v-col v-for="item in contentItems" :key="item.label" cols="6" sm="3">
-                  <v-sheet rounded="lg" class="pa-3 text-center" color="surface-variant" variant="tonal">
+                  <v-card variant="tonal" class="pa-3 text-center">
                     <v-icon :icon="item.icon" class="mb-1" />
                     <div class="text-title-large font-weight-bold">{{ item.value }}</div>
                     <div class="text-body-small text-medium-emphasis">{{ item.label }}</div>
-                  </v-sheet>
+                  </v-card>
                 </v-col>
               </v-row>
             </v-card-text>
@@ -128,13 +128,15 @@ import BarChart from "@/components/charts/BarChart.vue";
 import { useApi } from "@/composables/useApi";
 import { routeProps } from "@/router/RouteProps";
 import { formatDateTime, formatMinutes, shortDay } from "@/utils/date";
-import { ticketStatusInfo, type TicketStatus } from "@/modules/tickets/models/ticket.model";
+import { formatScore } from "@/utils/score";
+import { ticketStatusInfo } from "@/modules/tickets/models/constants/ticket.constants";
+import type { TicketStatus } from "@/modules/tickets/models/Types/TicketStatus";
 import { adminService } from "../services/admin.service";
-import type { AdminDashboard } from "../models/admin.model";
+import type { AdminDashboardDTO } from "../models/DTO/AdminDashboardDto";
 
 const { runOne } = useApi();
 
-const data = ref<AdminDashboard | null>(null);
+const data = ref<AdminDashboardDTO | null>(null);
 const loading = ref(false);
 
 const statusKeys = Object.keys(ticketStatusInfo) as TicketStatus[];

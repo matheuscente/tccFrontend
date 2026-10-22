@@ -4,14 +4,11 @@ import "@mdi/font/css/materialdesignicons.css";
 import { createVuetify } from "vuetify";
 import { aliases, mdi } from "vuetify/iconsets/mdi";
 import { pt } from "vuetify/locale";
+import { readStorage } from "@/utils/storage";
 
 const readTheme = (): "light" | "dark" => {
-  try {
-    const saved = localStorage.getItem("theme");
-    if (saved === "light" || saved === "dark") return saved;
-  } catch {
-    // storage indisponível
-  }
+  const saved = readStorage("theme");
+  if (saved === "light" || saved === "dark") return saved;
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 };
 

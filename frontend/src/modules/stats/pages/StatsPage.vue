@@ -19,10 +19,18 @@
             <v-text-field v-model="customStart" type="date" label="Data inicial" :max="customEnd || todayInput()" hide-details="auto" />
           </v-col>
           <v-col cols="12" sm="6" md="3">
-            <v-text-field v-model="customEnd" type="date" label="Data final" :min="customStart" :max="todayInput()" hide-details="auto" />
+            <v-text-field
+              v-model="customEnd"
+              type="date"
+              label="Data final"
+              :min="customStart"
+              :max="todayInput()"
+              :error-messages="customRangeError"
+              hide-details="auto"
+            />
           </v-col>
           <v-col cols="12" md="3" class="d-flex align-center">
-            <v-btn color="primary" variant="tonal" :disabled="!customStart || !customEnd" @click="load">Aplicar</v-btn>
+            <v-btn color="primary" variant="tonal" :disabled="!customRangeValid" @click="load">Aplicar</v-btn>
           </v-col>
         </v-row>
 
@@ -168,22 +176,29 @@ import LineChart from "@/components/charts/LineChart.vue";
 import DoughnutChart from "@/components/charts/DoughnutChart.vue";
 import { useApi } from "@/composables/useApi";
 import { routeProps } from "@/router/RouteProps";
-import { formatDateTime, formatMinutes, inputToApiDate, shortDay, todayInput } from "@/utils/date";
-import type { Scope } from "@/modules/courses/models/structure.model";
+import { useLatest } from "@/composables/useLatest";
+import { formatDateTime, formatMinutes, inputToApiDate, shortDay, toInputDate, todayInput } from "@/utils/date";
+import { formatScore } from "@/utils/score";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
 import { statsService } from "../services/stats.service";
-import type { Performance, StatsQuery, StudySummary } from "../models/stats.model";
+import type { PerformanceDTO } from "../models/DTO/PerformanceDto";
+import type { StatsQueryDTO } from "../models/DTO/StatsQueryDto";
+import type { StudySummaryDTO } from "../models/DTO/StudySummaryDto";
 
 const { runOne } = useApi();
+const latest = useLatest();
 
 const preset = ref<number | "custom">(30);
 const customStart = ref("");
 const customEnd = ref(todayInput());
 const scope = ref<Scope>({});
 const loading = ref(false);
-const summary = ref<StudySummary | null>(null);
-const performance = ref<Performance | null>(null);
+const summary = ref<StudySummaryDTO | null>(null);
+const performance = ref<PerformanceDTO | null>(null);
 
-const formatScore = (value: number | null) => (value === null ? "—" : `${Math.round(value * 10) / 10}%`);
+const customRangeError = computed(() =>
+  customStart.value && customEnd.value && customStart.value > customEnd.value ? "A data inicial não pode ser posterior à final." : "");
+const customRangeValid = computed(() => !!customStart.value && !!customEnd.value && !customRangeError.value);
 
 const scopeGroupLabel = computed(() => {
   if (scope.value.disciplineId || scope.value.moduleId) return "disciplina";
@@ -194,12 +209,11 @@ const scopeGroupLabel = computed(() => {
 const daysAgo = (days: number) => {
   const date = new Date();
   date.setDate(date.getDate() - (days - 1));
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  return inputToApiDate(toInputDate(date));
 };
 
-const buildQuery = (): StatsQuery => {
-  const query: StatsQuery = {};
+const buildQuery = (): StatsQueryDTO => {
+  const query: StatsQueryDTO = {};
   if (preset.value === "custom") {
     if (customStart.value) query.startDate = inputToApiDate(customStart.value);
     if (customEnd.value) query.endDate = inputToApiDate(customEnd.value);
@@ -213,7 +227,8 @@ const buildQuery = (): StatsQuery => {
 };
 
 const load = async () => {
-  if (preset.value === "custom" && (!customStart.value || !customEnd.value)) return;
+  if (preset.value === "custom" && !customRangeValid.value) return;
+  const request = latest.next();
   loading.value = true;
   try {
     const query = buildQuery();
@@ -221,10 +236,11 @@ const load = async () => {
       runOne(statsService.summary(query)),
       runOne(statsService.performance(query)),
     ]);
+    if (!latest.isLatest(request)) return;
     summary.value = summaryData;
     performance.value = performanceData;
   } finally {
-    loading.value = false;
+    if (latest.isLatest(request)) loading.value = false;
   }
 };
 

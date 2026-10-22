@@ -82,7 +82,7 @@
               </template>
               <template v-else-if="status === 'error'">
                 <v-icon icon="mdi-alert-circle-outline" color="error" size="16" /> Erro ao salvar
-                <v-btn size="x-small" variant="text" @click="save">Tentar novamente</v-btn>
+                <v-btn size="x-small" variant="text" @click="retrySave">Tentar novamente</v-btn>
               </template>
               <template v-else-if="status === 'pending'">
                 <v-icon icon="mdi-pencil-outline" size="16" /> Alterações pendentes
@@ -114,8 +114,9 @@ import { useConfirmStore } from "@/stores/confirm.store";
 import { isError } from "@/services/api/isError.typeGuard";
 import { formatDateTime } from "@/utils/date";
 import { maxLength, required } from "@/utils/rules";
-import type { Scope } from "@/modules/courses/models/structure.model";
-import type { Note } from "../models/note.model";
+import { useLatest } from "@/composables/useLatest";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import type { NoteDTO } from "../models/DTO/NoteDto";
 import { noteService } from "../services/note.service";
 
 const auth = useAuthStore();
@@ -123,21 +124,23 @@ const structure = useStructureStore();
 const confirm = useConfirmStore();
 const { mobile } = useDisplay();
 const { run, runOne } = useApi();
+const latest = useLatest();
 
-const notes = ref<Note[]>([]);
+const notes = ref<NoteDTO[]>([]);
 const loading = ref(false);
 const creating = ref(false);
 const search = ref<string | null>("");
 const filterCourseId = ref<string | null>(null);
-const selected = ref<Note | null>(null);
+const selected = ref<NoteDTO | null>(null);
 const draft = reactive<{ title: string, content: string, scope: Scope }>({ title: "", content: "", scope: {} });
 const status = ref<"saved" | "pending" | "saving" | "error">("saved");
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let loadingDraft = false;
+let editVersion = 0;
 
-const scopeOf = (note: Note): Scope =>
+const scopeOf = (note: NoteDTO): Scope =>
   note.disciplineId ? { disciplineId: note.disciplineId } : note.moduleId ? { moduleId: note.moduleId } : note.courseId ? { courseId: note.courseId } : {};
 
 const sameScope = (a: Scope, b: Scope) =>
@@ -147,15 +150,16 @@ const preview = (content: string) => content.replace(/\s+/g, " ").trim().slice(0
 
 const load = async () => {
   if (!auth.userId) return;
+  const request = latest.next();
   loading.value = true;
   try {
     const data = await run(noteService.listByUser(auth.userId, {
       ...(filterCourseId.value ? { courseId: filterCourseId.value } : {}),
       search: search.value?.trim() || undefined,
     }));
-    notes.value = data ?? [];
+    if (latest.isLatest(request)) notes.value = data ?? [];
   } finally {
-    loading.value = false;
+    if (latest.isLatest(request)) loading.value = false;
   }
 };
 
@@ -166,7 +170,7 @@ const flush = async () => {
   }
 };
 
-const select = async (note: Note) => {
+const select = async (note: NoteDTO) => {
   await flush();
   loadingDraft = true;
   selected.value = note;
@@ -174,7 +178,7 @@ const select = async (note: Note) => {
   draft.content = note.content;
   draft.scope = scopeOf(note);
   status.value = "saved";
-  // libera o watcher depois que o ScopeSelect sincronizar
+  // libera o watcher só depois que o ScopeSelect sincronizar, para a troca de nota não contar como edição
   setTimeout(() => { loadingDraft = false; }, 0);
 };
 
@@ -186,6 +190,7 @@ const save = async () => {
     return;
   }
 
+  const version = editVersion;
   status.value = "saving";
   const scopeChanged = !sameScope(draft.scope, scopeOf(note));
   const response = await noteService.update(note.id, {
@@ -198,8 +203,10 @@ const save = async () => {
     } : {}),
   });
 
+  const stillSelected = selected.value?.id === note.id;
+
   if (isError(response)) {
-    status.value = "error";
+    if (stillSelected) status.value = "error";
     return;
   }
 
@@ -207,13 +214,20 @@ const save = async () => {
   if (updated) {
     const index = notes.value.findIndex((item) => item.id === updated.id);
     if (index >= 0) notes.value.splice(index, 1, updated);
-    if (selected.value?.id === updated.id) selected.value = updated;
+    if (stillSelected) selected.value = updated;
   }
-  status.value = "saved";
+  // edições feitas durante o envio continuam pendentes (o timer já reagendou o save)
+  if (stillSelected && version === editVersion) status.value = "saved";
+};
+
+const retrySave = () => {
+  clearTimeout(saveTimer);
+  void save();
 };
 
 watch(draft, () => {
   if (loadingDraft || !selected.value) return;
+  editVersion++;
   status.value = "pending";
   clearTimeout(saveTimer);
   saveTimer = setTimeout(save, 1000);
@@ -259,10 +273,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   clearTimeout(searchTimer);
-  if (status.value === "pending") {
-    clearTimeout(saveTimer);
-    void save();
-  }
+  clearTimeout(saveTimer);
+  if (status.value === "pending") void save();
 });
 </script>
 

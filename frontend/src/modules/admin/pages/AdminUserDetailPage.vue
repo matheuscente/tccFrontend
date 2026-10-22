@@ -27,7 +27,7 @@
           <StatCard label="Últimos 30 dias" :value="formatMinutes(overview.study.minutesLast30Days)" :caption="overview.study.lastStudyAt ? `último estudo em ${formatDay(overview.study.lastStudyAt)}` : 'nenhum estudo registrado'" icon="mdi-calendar-month-outline" color="secondary" />
         </v-col>
         <v-col cols="12" sm="6" lg="3">
-          <StatCard label="Média nas atividades" :value="overview.activities.averageScore !== null ? `${overview.activities.averageScore}%` : '—'" :caption="`${overview.activities.attempts} tentativas`" icon="mdi-percent-outline" color="warning" />
+          <StatCard label="Média nas atividades" :value="formatScore(overview.activities.averageScore)" :caption="`${overview.activities.attempts} tentativas`" icon="mdi-percent-outline" color="warning" />
         </v-col>
         <v-col cols="12" sm="6" lg="3">
           <StatCard label="Armazenamento" :value="formatBytes(overview.storage.bytes)" :caption="`${overview.storage.files} arquivo(s)`" icon="mdi-cloud-outline" color="info" />
@@ -172,7 +172,7 @@
                   </td>
                   <td class="text-right">{{ activity.questionCount }}</td>
                   <td class="text-right">{{ activity.attemptCount }}</td>
-                  <td class="text-right">{{ activity.bestScore !== null ? `${activity.bestScore}%` : "—" }}</td>
+                  <td class="text-right">{{ formatScore(activity.bestScore) }}</td>
                 </tr>
               </tbody>
             </v-table>
@@ -200,16 +200,23 @@ import DoughnutChart from "@/components/charts/DoughnutChart.vue";
 import { useApi } from "@/composables/useApi";
 import { routeProps } from "@/router/RouteProps";
 import { formatBytes, formatDateTime, formatDay, formatMinutes, shortDay } from "@/utils/date";
-import { courseService, disciplineService, moduleService } from "@/modules/courses/services/structure.service";
-import type { Course, Discipline, Module } from "@/modules/courses/models/structure.model";
+import { formatScore } from "@/utils/score";
+import { courseService } from "@/modules/courses/services/course.service";
+import { moduleService } from "@/modules/courses/services/module.service";
+import { disciplineService } from "@/modules/courses/services/discipline.service";
+import type { CourseDTO } from "@/modules/courses/models/DTO/CourseDto";
+import type { ModuleDTO } from "@/modules/courses/models/DTO/ModuleDto";
+import type { DisciplineDTO } from "@/modules/courses/models/DTO/DisciplineDto";
 import { goalService } from "@/modules/goals/services/goal.service";
-import { goalStatusInfo, goalTypeLabels, type GoalProgress } from "@/modules/goals/models/goal.model";
+import { goalStatusInfo, goalTypeLabels } from "@/modules/goals/models/constants/goal.constants";
+import type { GoalProgressDTO } from "@/modules/goals/models/DTO/GoalProgressDto";
 import { statsService } from "@/modules/stats/services/stats.service";
-import type { Performance, StudySummary } from "@/modules/stats/models/stats.model";
+import type { PerformanceDTO } from "@/modules/stats/models/DTO/PerformanceDto";
+import type { StudySummaryDTO } from "@/modules/stats/models/DTO/StudySummaryDto";
 import { activityService } from "@/modules/activities/services/activity.service";
-import type { Activity } from "@/modules/activities/models/activity.model";
+import type { ActivityDTO } from "@/modules/activities/models/DTO/ActivityDto";
 import { adminService } from "../services/admin.service";
-import type { AdminUserOverview } from "../models/admin.model";
+import type { AdminUserOverviewDTO } from "../models/DTO/AdminUserOverviewDto";
 
 const route = useRoute();
 const { run, runOne } = useApi();
@@ -217,19 +224,19 @@ const { run, runOne } = useApi();
 const userId = computed(() => String(route.params.id));
 
 const loading = ref(false);
-const overview = ref<AdminUserOverview | null>(null);
-const summary = ref<StudySummary | null>(null);
-const performance = ref<Performance | null>(null);
-const goals = ref<GoalProgress[]>([]);
-const activities = ref<Activity[]>([]);
-const courses = ref<Course[]>([]);
-const modules = ref<Module[]>([]);
-const disciplines = ref<Discipline[]>([]);
+const overview = ref<AdminUserOverviewDTO | null>(null);
+const summary = ref<StudySummaryDTO | null>(null);
+const performance = ref<PerformanceDTO | null>(null);
+const goals = ref<GoalProgressDTO[]>([]);
+const activities = ref<ActivityDTO[]>([]);
+const courses = ref<CourseDTO[]>([]);
+const modules = ref<ModuleDTO[]>([]);
+const disciplines = ref<DisciplineDTO[]>([]);
 
 const modulesOf = (courseId: string) => modules.value.filter((module) => module.courseId === courseId);
 const disciplinesOf = (moduleId: string) => disciplines.value.filter((discipline) => discipline.moduleId === moduleId);
 
-// caminho legível do escopo usando a estrutura deste usuário (não a do administrador)
+// usa a estrutura do usuário acompanhado: o store de estrutura guarda apenas a do administrador logado
 const scopePath = (scope: { courseId: string | null, moduleId: string | null, disciplineId: string | null }) => {
   const discipline = disciplines.value.find((item) => item.id === scope.disciplineId);
   const module = modules.value.find((item) => item.id === (scope.moduleId ?? discipline?.moduleId));
@@ -277,7 +284,6 @@ const load = async () => {
     courses.value = coursesData ?? [];
     modules.value = modulesData ?? [];
     disciplines.value = disciplinesData ?? [];
-
   } finally {
     loading.value = false;
   }

@@ -1,4 +1,5 @@
-// Regras de validação dos formulários (espelham os validators do backend)
+import { todayInput } from "./date";
+
 type Rule = (value: unknown) => true | string;
 
 export const required = (label = "Campo"): Rule => (value) =>
@@ -30,7 +31,5 @@ export const positiveInteger = (label = "Valor"): Rule => (value) =>
 
 export const notFuture: Rule = (value) => {
   if (!value) return true;
-  const today = new Date();
-  const limit = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  return String(value) <= limit || "A data não pode ser futura.";
+  return String(value) <= todayInput() || "A data não pode ser futura.";
 };

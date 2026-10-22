@@ -21,13 +21,13 @@
               label="Tipo de meta"
               :rules="[required('Tipo')]"
               :error-messages="fieldErrors.type"
-              :hint="typeHints[data.type]"
+              :hint="goalTypeHints[data.type]"
               persistent-hint
               class="mb-4"
             />
           </template>
           <v-alert v-else variant="tonal" density="compact" type="info" class="mb-4">
-            {{ goalTypeLabels[goal.type] }} — {{ typeHints[goal.type] }}
+            {{ goalTypeLabels[goal.type] }} — {{ goalTypeHints[goal.type] }}
           </v-alert>
 
           <div class="text-label-large mb-2">Tempo de estudo da meta</div>
@@ -91,22 +91,17 @@ import { computed, reactive, ref, watch } from "vue";
 import type { VForm } from "vuetify/components";
 import ScopeSelect from "@/components/ScopeSelect.vue";
 import { goalService } from "../services/goal.service";
-import { goalTypeLabels, type Goal, type GoalType } from "../models/goal.model";
-import type { Scope } from "@/modules/courses/models/structure.model";
+import { goalTypeHints, goalTypeLabels } from "../models/constants/goal.constants";
+import type { GoalDTO } from "../models/DTO/GoalDto";
+import type { GoalType } from "../models/Types/GoalType";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
 import { isError } from "@/services/api/isError.typeGuard";
 import { splitApiErrors } from "@/utils/apiErrors";
 import { inputToApiDate, isoToInputDate, todayInput } from "@/utils/date";
 import { maxLength, minLength, required } from "@/utils/rules";
 
-const props = withDefaults(defineProps<{ modelValue: boolean, goal?: Goal | null }>(), { goal: null });
+const props = withDefaults(defineProps<{ modelValue: boolean, goal?: GoalDTO | null }>(), { goal: null });
 const emit = defineEmits<{ "update:modelValue": [value: boolean], saved: [] }>();
-
-const typeHints: Record<GoalType, string> = {
-  DAILY_ONCE: "Estudar o tempo definido em um único dia.",
-  DAILY_RECURRING: "Estudar o tempo definido todos os dias, a partir da data de início.",
-  TOTAL_BY_DATE: "Acumular o tempo total até a data final.",
-  TOTAL_IN_PERIOD: "Acumular o tempo total dentro do período (início e fim).",
-};
 
 const typeItems = (Object.keys(goalTypeLabels) as GoalType[]).map((value) => ({ value, title: goalTypeLabels[value] }));
 

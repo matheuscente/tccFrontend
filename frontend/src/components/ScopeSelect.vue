@@ -12,7 +12,7 @@
           :clearable="!required"
           :disabled="disabled"
           :rules="required ? [(v: unknown) => !!v || 'Selecione pelo menos o curso.'] : []"
-          :no-data-text="'Nenhum curso cadastrado'"
+          no-data-text="Nenhum curso cadastrado"
           hide-details="auto"
           prepend-inner-icon="mdi-school-outline"
         />
@@ -53,19 +53,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useStructureStore } from "@/stores/structure.store";
-import type { Scope } from "@/modules/courses/models/structure.model";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
 
-/**
- * Seletor em cascata curso > módulo > disciplina.
- * Emite o escopo mais específico escolhido: { courseId } | { moduleId } | { disciplineId } | {}.
- */
+// Emite só o escopo mais específico ({ courseId } | { moduleId } | { disciplineId } | {}):
+// a API exige exatamente um id de escopo e deriva os níveis acima dele.
 const props = withDefaults(defineProps<{
   modelValue: Scope
   required?: boolean
   disabled?: boolean
   label?: string
   hint?: string
-  /** um seletor por linha (para cards estreitos) */
   stacked?: boolean
 }>(), { required: false, disabled: false, label: "", hint: "", stacked: false });
 
@@ -80,7 +77,6 @@ const disciplineId = ref<string | null>(null);
 const moduleItems = computed(() => structure.modulesOf(courseId.value));
 const disciplineItems = computed(() => structure.disciplinesOf(moduleId.value));
 
-// preenche os três seletores a partir do escopo recebido
 const syncFromValue = (scope: Scope) => {
   if (scope.disciplineId) {
     const discipline = structure.disciplineById(scope.disciplineId);

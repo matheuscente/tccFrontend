@@ -31,7 +31,7 @@
       <v-col cols="12" sm="6" lg="3">
         <StatCard
           label="Média nas atividades"
-          :value="performance?.averageScore !== null && performance?.averageScore !== undefined ? `${performance.averageScore}%` : '—'"
+          :value="formatScore(performance?.averageScore)"
           icon="mdi-clipboard-check-outline"
           color="info"
           :caption="`${performance?.totalAttempts ?? 0} tentativa(s)`"
@@ -140,19 +140,22 @@ import { useStructureStore } from "@/stores/structure.store";
 import { useApi } from "@/composables/useApi";
 import { statsService } from "@/modules/stats/services/stats.service";
 import { goalService } from "@/modules/goals/services/goal.service";
-import { goalStatusInfo, type GoalProgress } from "@/modules/goals/models/goal.model";
-import type { Performance, StudySummary } from "@/modules/stats/models/stats.model";
+import { goalStatusInfo } from "@/modules/goals/models/constants/goal.constants";
+import type { GoalProgressDTO } from "@/modules/goals/models/DTO/GoalProgressDto";
+import type { PerformanceDTO } from "@/modules/stats/models/DTO/PerformanceDto";
+import type { StudySummaryDTO } from "@/modules/stats/models/DTO/StudySummaryDto";
 import { routeProps } from "@/router/RouteProps";
 import { formatMinutes, shortDay } from "@/utils/date";
+import { formatScore } from "@/utils/score";
 
 const auth = useAuthStore();
 const structure = useStructureStore();
 const { runOne, run } = useApi();
 
 const loading = ref(true);
-const summary = ref<StudySummary | null>(null);
-const performance = ref<Performance | null>(null);
-const goals = ref<GoalProgress[]>([]);
+const summary = ref<StudySummaryDTO | null>(null);
+const performance = ref<PerformanceDTO | null>(null);
+const goals = ref<GoalProgressDTO[]>([]);
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
@@ -178,7 +181,6 @@ const weekMinutes = computed(() => perDay.value.slice(-7).reduce((total, day) =>
 
 const achievedGoals = computed(() => goals.value.filter((goal) => goal.status === "ACHIEVED").length);
 
-// metas em andamento primeiro
 const visibleGoals = computed(() => {
   const order = { IN_PROGRESS: 0, ACHIEVED: 1, NOT_STARTED: 2, EXPIRED: 3 } as const;
   return [...goals.value].sort((a, b) => order[a.status] - order[b.status]).slice(0, 5);

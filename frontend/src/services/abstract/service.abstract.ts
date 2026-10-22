@@ -4,10 +4,7 @@ import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export type ApiResult<T> = ApiSuccess<T> | ApiError;
 
-/**
- * Camada fina sobre o axios. Os erros HTTP não lançam exceção: o interceptor devolve
- * a resposta e aqui ela vira um ApiError ({ state: "error", data: [...] }).
- */
+// Erros HTTP não lançam exceção: o interceptor devolve a resposta e aqui ela vira um ApiError.
 export class Service {
   private http: AxiosInstance;
 
@@ -38,7 +35,6 @@ export class Service {
   private normalize<T>(response: AxiosResponse): ApiResult<T> {
     const body = response.data;
 
-    // 204 No Content ou corpo vazio
     if (response.status < 400 && (body === "" || body === undefined || body === null)) {
       return { statusCode: response.status, state: "success", data: [] };
     }

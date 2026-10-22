@@ -1,8 +1,8 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 import type { ApiError } from "./models/ApiError.interface";
-import type { UseAuthStore } from "@/modules/auth/stores/models/AuthStore.interface";
-import type { Login } from "@/modules/auth/models/login.dto";
 import type { ApiSuccess } from "./models/ApiSuccess.interface";
+import type { UseAuthStore } from "@/modules/auth/stores/models/AuthStore.interface";
+import type { LoginResponseDTO } from "@/modules/auth/models/DTO/LoginDto";
 import { isAuthRoute } from "./isAuthRoute.typeGuard";
 
 declare module "axios" {
@@ -18,8 +18,8 @@ export const http = axios.create({ baseURL: BASE_URL, withCredentials: true });
 let updating: Promise<void> | null = null;
 
 export async function refreshSession(store: UseAuthStore): Promise<void> {
-  // axios puro, sem o interceptor, para o refresh não tentar se renovar
-  const { data } = await axios.post<ApiSuccess<Login>>(`${BASE_URL}/auth/refresh`, null, {
+  // axios puro, sem o interceptor, para que uma falha no refresh não dispare outro refresh
+  const { data } = await axios.post<ApiSuccess<LoginResponseDTO>>(`${BASE_URL}/auth/refresh`, null, {
     withCredentials: true,
   });
   const session = data.data[0];
@@ -28,7 +28,6 @@ export async function refreshSession(store: UseAuthStore): Promise<void> {
 
   store.setToken(session.accessToken);
   store.setExpiresAt(session.sessionExpiresAt);
-
 }
 
 function networkError(error: AxiosError): AxiosResponse<ApiError> {
@@ -47,10 +46,10 @@ function networkError(error: AxiosError): AxiosResponse<ApiError> {
 
 export function configureInterceptors(store: UseAuthStore): void {
   http.interceptors.request.use((config) => {
-      if (!isAuthRoute(config.url) && store.getToken() && store.isSessionExpired()) {
-    store.logout();
-    return new Promise<never>(() => {});
-  }
+    if (!isAuthRoute(config.url) && store.getToken() && store.isSessionExpired()) {
+      void store.logout();
+      return new Promise<never>(() => {});
+    }
     const token = store.getToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
@@ -67,7 +66,6 @@ export function configureInterceptors(store: UseAuthStore): void {
 
       req._retry = true;
 
-      
       updating ??= refreshSession(store).finally(() => {
         updating = null;
       });
@@ -76,7 +74,7 @@ export function configureInterceptors(store: UseAuthStore): void {
         await updating;
         return http(req);
       } catch {
-        store.logout();
+        void store.logout();
         return new Promise<never>(() => {});
       }
     }

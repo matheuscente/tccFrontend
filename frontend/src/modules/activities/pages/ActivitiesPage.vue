@@ -51,7 +51,7 @@
             </v-btn>
             <v-btn variant="text" :to="{ name: routeProps.activityDetail.name, params: { id: activity.id } }">Gerenciar</v-btn>
             <v-spacer />
-            <v-btn icon="mdi-delete-outline" variant="text" color="error" aria-label="Excluir atividade" @click="remove(activity)" />
+            <v-btn icon="mdi-delete-outline" variant="text" color="error" :aria-label="`Excluir atividade ${activity.title}`" @click="remove(activity)" />
           </v-card-actions>
         </v-card>
       </v-col>
@@ -121,21 +121,23 @@ import { isError } from "@/services/api/isError.typeGuard";
 import { firstErrorMessage } from "@/utils/apiErrors";
 import { maxLength, minLength, required } from "@/utils/rules";
 import { routeProps } from "@/router/RouteProps";
-import type { Scope } from "@/modules/courses/models/structure.model";
-import type { Question } from "@/modules/questions/models/question.model";
+import { useLatest } from "@/composables/useLatest";
+import { formatScore, scoreColor } from "@/utils/score";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import type { QuestionDTO } from "@/modules/questions/models/DTO/QuestionDto";
 import { questionService } from "@/modules/questions/services/question.service";
-import type { Activity } from "../models/activity.model";
+import type { ActivityDTO } from "../models/DTO/ActivityDto";
 import { activityService } from "../services/activity.service";
 import QuestionPicker from "../components/QuestionPicker.vue";
-import { formatScore, scoreColor } from "../components/scoreColor";
 
 const auth = useAuthStore();
 const confirm = useConfirmStore();
 const notify = useNotifyStore();
 const router = useRouter();
 const { run } = useApi();
+const latestQuestions = useLatest();
 
-const activities = ref<Activity[]>([]);
+const activities = ref<ActivityDTO[]>([]);
 const loading = ref(false);
 
 const dialog = ref(false);
@@ -144,7 +146,7 @@ const title = ref("");
 const description = ref("");
 const scope = ref<Scope>({});
 const selected = ref<string[]>([]);
-const available = ref<Question[]>([]);
+const available = ref<QuestionDTO[]>([]);
 const loadingQuestions = ref(false);
 const saving = ref(false);
 const error = ref<string>();
@@ -162,14 +164,17 @@ const load = async () => {
 };
 
 watch(scope, async () => {
+  const request = latestQuestions.next();
   selected.value = [];
   available.value = [];
+  loadingQuestions.value = false;
   if (!hasScope.value) return;
   loadingQuestions.value = true;
   try {
-    available.value = (await run(questionService.listByUser(auth.userId, scope.value))) ?? [];
+    const data = (await run(questionService.listByUser(auth.userId, scope.value))) ?? [];
+    if (latestQuestions.isLatest(request)) available.value = data;
   } finally {
-    loadingQuestions.value = false;
+    if (latestQuestions.isLatest(request)) loadingQuestions.value = false;
   }
 }, { deep: true });
 
@@ -191,7 +196,6 @@ const create = async () => {
 
   saving.value = true;
   try {
-    // mantém a ordem em que as questões aparecem na lista
     const questionIds = available.value.filter((question) => selected.value.includes(question.id)).map((question) => question.id);
     const response = await activityService.create({
       title: title.value.trim(),
@@ -216,7 +220,7 @@ const create = async () => {
   }
 };
 
-const remove = async (activity: Activity) => {
+const remove = async (activity: ActivityDTO) => {
   const ok = await confirm.ask({
     title: "Excluir atividade",
     message: `Excluir "${activity.title}"? O histórico de tentativas também deixará de aparecer.`,

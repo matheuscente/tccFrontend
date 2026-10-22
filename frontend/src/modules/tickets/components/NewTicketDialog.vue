@@ -53,10 +53,12 @@ import { maxLength, minLength, required } from "@/utils/rules";
 import { useNotifyStore } from "@/stores/notify.store";
 import ImagePicker from "./ImagePicker.vue";
 import { ticketService } from "../services/ticket.service";
-import { ticketCategoryLabels, type TicketCategory, type TicketDetail } from "../models/ticket.model";
+import { ticketCategoryLabels } from "../models/constants/ticket.constants";
+import type { TicketDetailDTO } from "../models/DTO/TicketDetailDto";
+import type { TicketCategory } from "../models/Types/TicketCategory";
 
 const open = defineModel<boolean>({ default: false });
-const emit = defineEmits<{ created: [ticket: TicketDetail] }>();
+const emit = defineEmits<{ created: [ticket: TicketDetailDTO] }>();
 
 const notify = useNotifyStore();
 

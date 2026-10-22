@@ -1,9 +1,9 @@
-import type { RouteRecordRaw } from "vue-router";
+import type { RouteMeta, RouteRecordRaw } from "vue-router";
 import { routeProps } from "./RouteProps";
 
 type PageKey = Exclude<keyof typeof routeProps, "index">;
 
-const page = (key: PageKey, component: RouteRecordRaw["component"], meta: Record<string, unknown> = {}): RouteRecordRaw => ({
+const page = (key: PageKey, component: RouteRecordRaw["component"], meta: RouteMeta = {}): RouteRecordRaw => ({
   path: routeProps[key].path,
   name: routeProps[key].name,
   component,
@@ -16,13 +16,11 @@ const routes: RouteRecordRaw[] = [
     redirect: routeProps.index.redirect,
   },
 
-  // públicas (somente para quem não está logado)
   page("login", () => import("@/modules/auth/pages/LoginPage.vue"), { guestOnly: true }),
   page("register", () => import("@/modules/user/pages/RegisterPage.vue"), { guestOnly: true }),
   page("forgotPassword", () => import("@/modules/auth/pages/ForgotPasswordPage.vue"), { guestOnly: true }),
   page("resetPassword", () => import("@/modules/auth/pages/ResetPasswordPage.vue")),
 
-  // área logada
   {
     path: "/",
     component: () => import("@/layouts/AppLayout.vue"),

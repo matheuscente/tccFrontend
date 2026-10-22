@@ -56,6 +56,7 @@ import { useAuthStore } from "../stores/auth.store";
 import { routeProps } from "@/router/RouteProps";
 import { minLength, required } from "@/utils/rules";
 import { splitApiErrors } from "@/utils/apiErrors";
+import { isError } from "@/services/api/isError.typeGuard";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -68,6 +69,12 @@ const showPassword = ref(false);
 const loading = ref(false);
 const loginError = ref<string>();
 const fieldErrors = ref<Record<string, string>>({});
+
+const safeRedirect = (): string | null => {
+  const redirect = route.query.redirect;
+  // só caminhos internos: "//host" ou "/\host" seriam tratados como outra origem
+  return typeof redirect === "string" && /^\/(?![/\\])/.test(redirect) ? redirect : null;
+};
 
 const handleLogin = async () => {
   if (!form.value) return;
@@ -82,15 +89,14 @@ const handleLogin = async () => {
   try {
     const response = await authStore.login(username.value.trim(), password.value);
 
-    if (response?.state === "error") {
+    if (isError(response)) {
       const { fields, general } = splitApiErrors(response);
       fieldErrors.value = fields;
       loginError.value = general;
       return;
     }
 
-    const redirect = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/") ? route.query.redirect : null;
-    router.push(redirect ?? { name: routeProps.home.name });
+    await router.push(safeRedirect() ?? { name: routeProps.home.name });
   } finally {
     loading.value = false;
   }

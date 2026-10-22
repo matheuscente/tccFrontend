@@ -4,7 +4,7 @@
 
     <v-row class="mb-2">
       <v-col cols="12" lg="7">
-        <StudyTimerCard @finished="load" />
+        <StudyTimerCard />
       </v-col>
 
       <v-col cols="12" lg="5">
@@ -131,8 +131,8 @@ import ScopeSelect from "@/components/ScopeSelect.vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
 import StudyTimerCard from "../components/StudyTimerCard.vue";
 import { studySessionService } from "../services/study-session.service";
-import type { StudySession } from "../models/study-session.model";
-import type { Scope } from "@/modules/courses/models/structure.model";
+import type { StudySessionDTO } from "../models/DTO/StudySessionDto";
+import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
 import { useStructureStore } from "@/stores/structure.store";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useTimerStore } from "../stores/timer.store";
@@ -160,7 +160,7 @@ const headers = [
 ];
 
 const loading = ref(false);
-const sessions = ref<StudySession[]>([]);
+const sessions = ref<StudySessionDTO[]>([]);
 
 const completed = computed(() => sessions.value.filter((session) => session.status === "COMPLETED"));
 const totalMinutes = computed(() => completed.value.reduce((total, session) => total + session.minutes, 0));
@@ -174,7 +174,6 @@ const load = async () => {
   }
 };
 
-// registro manual
 const manualForm = ref<VForm | null>(null);
 const manual = reactive({ scope: {} as Scope, minutes: 30, date: todayInput() });
 const manualErrors = ref<Record<string, string>>({});
@@ -207,14 +206,13 @@ const register = async () => {
   }
 };
 
-// edição
 const editDialog = ref(false);
 const editForm = ref<VForm | null>(null);
-const editing = ref<StudySession | null>(null);
+const editing = ref<StudySessionDTO | null>(null);
 const edit = reactive({ minutes: 0, date: "" });
 const saving = ref(false);
 
-const openEdit = (session: StudySession) => {
+const openEdit = (session: StudySessionDTO) => {
   editing.value = session;
   edit.minutes = session.minutes;
   edit.date = isoToInputDate(session.studiedAt);
@@ -241,7 +239,7 @@ const saveEdit = async () => {
   }
 };
 
-const remove = async (session: StudySession) => {
+const remove = async (session: StudySessionDTO) => {
   const ok = await confirm.ask({
     title: "Excluir sessão",
     message: session.status === "IN_PROGRESS"
@@ -252,11 +250,11 @@ const remove = async (session: StudySession) => {
   if (!ok) return;
   if (await run(studySessionService.remove(session.id), "Sessão excluída.")) {
     if (timer.active?.id === session.id) timer.reset();
-    await load();
+    else await load();
   }
 };
 
-// atualiza o histórico quando um cronômetro é iniciado pelo topo/curso
+// cobre início/fim do cronômetro feito por este card ou por outra tela
 watch(() => timer.active?.id, () => load());
 
 onMounted(async () => {

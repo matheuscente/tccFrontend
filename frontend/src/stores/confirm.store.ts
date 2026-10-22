@@ -7,7 +7,6 @@ interface ConfirmOptions {
   color?: string
 }
 
-/** Diálogo de confirmação global: await confirm({...}) => boolean */
 export const useConfirmStore = defineStore("confirm", {
   state: () => ({
     visible: false,
@@ -19,6 +18,7 @@ export const useConfirmStore = defineStore("confirm", {
   }),
   actions: {
     ask(options: ConfirmOptions): Promise<boolean> {
+      this.resolver?.(false);
       this.title = options.title;
       this.message = options.message;
       this.confirmText = options.confirmText ?? "Confirmar";

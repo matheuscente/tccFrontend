@@ -3,10 +3,6 @@ import type { ApiResult } from "@/services/abstract/service.abstract";
 import { useNotifyStore } from "@/stores/notify.store";
 import { firstErrorMessage } from "@/utils/apiErrors";
 
-/**
- * Executa uma chamada e trata o erro com o snackbar.
- * Retorna os dados (array) ou null quando houve erro.
- */
 export const useApi = () => {
   const notify = useNotifyStore();
 
