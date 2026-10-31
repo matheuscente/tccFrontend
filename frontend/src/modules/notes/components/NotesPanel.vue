@@ -1,17 +1,13 @@
 <template>
   <div>
-    <PageHeader title="Bloco de notas" subtitle="Suas anotações são privadas: somente você pode vê-las">
-      <template #actions>
-        <v-btn color="primary" prepend-icon="mdi-plus" :loading="creating" @click="createNote">Nova nota</v-btn>
-      </template>
-    </PageHeader>
-
     <v-row>
       <v-col cols="12" md="4" :class="{ 'd-none': mobile && selected }">
         <v-card class="notes-list">
           <v-card-text class="pb-2">
-            <v-text-field v-model="search" label="Buscar" prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" class="mb-3" />
+            <v-btn block color="primary" prepend-icon="mdi-plus" class="mb-3" :loading="creating" @click="createNote">Nova nota</v-btn>
+            <v-text-field v-model="search" label="Buscar" prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" :class="{ 'mb-3': !fixed }" />
             <v-select
+              v-if="!fixed"
               v-model="filterCourseId"
               :items="structure.courses"
               item-title="title"
@@ -41,7 +37,8 @@
               <v-list-item-title class="font-weight-medium">{{ note.title || "Sem título" }}</v-list-item-title>
               <v-list-item-subtitle>{{ preview(note.content) }}</v-list-item-subtitle>
               <div class="d-flex align-center justify-space-between mt-1">
-                <ScopeLabel :scope="note" />
+                <ScopeLabel v-if="!fixed || !sameScope(scopeOf(note), fixedScope)" :scope="note" show-empty />
+                <span v-else />
                 <span class="text-body-small text-medium-emphasis">{{ formatDateTime(note.updatedAt) }}</span>
               </div>
             </v-list-item>
@@ -64,17 +61,14 @@
               <v-btn icon="mdi-delete-outline" variant="text" color="error" aria-label="Excluir nota" @click="remove" />
             </div>
 
-            <v-textarea
-              v-model="draft.content"
-              label="Conteúdo"
-              rows="16"
-              auto-grow
-              counter="100000"
-              placeholder="Escreva suas anotações aqui…"
-              class="mb-2 content-area"
-            />
+            <MarkdownEditor v-model="draft.content" :rows="16" class="mb-2" />
 
-            <ScopeSelect v-model="draft.scope" label="Vínculo (opcional)" />
+            <div v-if="!editingScope" class="d-flex flex-wrap align-center ga-2">
+              <span class="text-label-large">Vínculo:</span>
+              <ScopeLabel :scope="draft.scope" show-empty />
+              <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-pencil-outline" @click="editingScope = true">Alterar</v-btn>
+            </div>
+            <ScopeSelect v-else v-model="draft.scope" label="Vínculo (opcional)" stacked />
 
             <div class="d-flex align-center justify-end ga-2 mt-3 text-body-small text-medium-emphasis">
               <template v-if="status === 'saving'">
@@ -101,12 +95,12 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import PageHeader from "@/components/PageHeader.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import ScopeSelect from "@/components/ScopeSelect.vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
+import MarkdownEditor from "@/components/MarkdownEditor.vue";
 import { useApi } from "@/composables/useApi";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useStructureStore } from "@/stores/structure.store";
@@ -116,8 +110,12 @@ import { formatDateTime } from "@/utils/date";
 import { maxLength, required } from "@/utils/rules";
 import { useLatest } from "@/composables/useLatest";
 import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
+import { hasScope, sameScope, scopeOf } from "@/utils/scope";
 import type { NoteDTO } from "../models/DTO/NoteDto";
 import { noteService } from "../services/note.service";
+
+const props = withDefaults(defineProps<{ scope?: Scope | null }>(), { scope: null });
+const emit = defineEmits<{ changed: [] }>();
 
 const auth = useAuthStore();
 const structure = useStructureStore();
@@ -134,17 +132,15 @@ const filterCourseId = ref<string | null>(null);
 const selected = ref<NoteDTO | null>(null);
 const draft = reactive<{ title: string, content: string, scope: Scope }>({ title: "", content: "", scope: {} });
 const status = ref<"saved" | "pending" | "saving" | "error">("saved");
+const editingScope = ref(false);
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let loadingDraft = false;
 let editVersion = 0;
 
-const scopeOf = (note: NoteDTO): Scope =>
-  note.disciplineId ? { disciplineId: note.disciplineId } : note.moduleId ? { moduleId: note.moduleId } : note.courseId ? { courseId: note.courseId } : {};
-
-const sameScope = (a: Scope, b: Scope) =>
-  (a.courseId ?? null) === (b.courseId ?? null) && (a.moduleId ?? null) === (b.moduleId ?? null) && (a.disciplineId ?? null) === (b.disciplineId ?? null);
+const fixed = computed(() => hasScope(props.scope));
+const fixedScope = computed<Scope>(() => (fixed.value ? scopeOf(props.scope ?? {}) : {}));
 
 const preview = (content: string) => content.replace(/\s+/g, " ").trim().slice(0, 90) || "Nota vazia";
 
@@ -154,7 +150,7 @@ const load = async () => {
   loading.value = true;
   try {
     const data = await run(noteService.listByUser(auth.userId, {
-      ...(filterCourseId.value ? { courseId: filterCourseId.value } : {}),
+      ...(fixed.value ? fixedScope.value : filterCourseId.value ? { courseId: filterCourseId.value } : {}),
       search: search.value?.trim() || undefined,
     }));
     if (latest.isLatest(request)) notes.value = data ?? [];
@@ -174,6 +170,7 @@ const select = async (note: NoteDTO) => {
   await flush();
   loadingDraft = true;
   selected.value = note;
+  editingScope.value = false;
   draft.title = note.title;
   draft.content = note.content;
   draft.scope = scopeOf(note);
@@ -243,8 +240,9 @@ const createNote = async () => {
   await flush();
   creating.value = true;
   try {
-    const created = await runOne(noteService.create({ title: "Nova nota", content: "" }));
+    const created = await runOne(noteService.create({ title: "Nova nota", content: "", ...fixedScope.value }));
     if (created) {
+      emit("changed");
       notes.value.unshift(created);
       await select(created);
     }
@@ -262,6 +260,7 @@ const remove = async () => {
   if (await run(noteService.remove(note.id), "Nota excluída.")) {
     notes.value = notes.value.filter((item) => item.id !== note.id);
     selected.value = null;
+    emit("changed");
     status.value = "saved";
   }
 };
@@ -284,8 +283,4 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
-.content-area :deep(textarea) {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  line-height: 1.6;
-}
 </style>

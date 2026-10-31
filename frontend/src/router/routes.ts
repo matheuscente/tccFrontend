@@ -10,6 +10,14 @@ const page = (key: PageKey, component: RouteRecordRaw["component"], meta: RouteM
   meta: { title: routeProps[key].title, ...meta },
 } as RouteRecordRaw);
 
+// endereços antigos das telas que viraram abas da Biblioteca
+const legacyLibraryPaths = [
+  { path: "/files", tab: "files" },
+  { path: "/notes", tab: "notes" },
+  { path: "/questions", tab: "questions" },
+  { path: "/activities", tab: "activities" },
+];
+
 const routes: RouteRecordRaw[] = [
   {
     path: routeProps.index.path,
@@ -29,15 +37,17 @@ const routes: RouteRecordRaw[] = [
       page("home", () => import("@/modules/dashboard/pages/DashboardPage.vue")),
       page("courses", () => import("@/modules/courses/pages/CoursesPage.vue")),
       page("courseDetail", () => import("@/modules/courses/pages/CourseDetailPage.vue")),
+      page("moduleDetail", () => import("@/modules/courses/pages/CourseDetailPage.vue")),
+      page("disciplineDetail", () => import("@/modules/courses/pages/CourseDetailPage.vue")),
+      page("library", () => import("@/modules/library/pages/LibraryPage.vue")),
+      page("courseReader", () => import("@/modules/study/pages/StudyReaderPage.vue"), { focus: true }),
+      page("moduleReader", () => import("@/modules/study/pages/StudyReaderPage.vue"), { focus: true }),
+      page("disciplineReader", () => import("@/modules/study/pages/StudyReaderPage.vue"), { focus: true }),
       page("goals", () => import("@/modules/goals/pages/GoalsPage.vue")),
       page("study", () => import("@/modules/study/pages/StudyPage.vue")),
-      page("questions", () => import("@/modules/questions/pages/QuestionsPage.vue")),
-      page("activities", () => import("@/modules/activities/pages/ActivitiesPage.vue")),
       page("activityDetail", () => import("@/modules/activities/pages/ActivityDetailPage.vue")),
       page("activityAnswer", () => import("@/modules/activities/pages/ActivityAnswerPage.vue")),
       page("attemptResult", () => import("@/modules/activities/pages/AttemptResultPage.vue")),
-      page("notes", () => import("@/modules/notes/pages/NotesPage.vue")),
-      page("files", () => import("@/modules/files/pages/FilesPage.vue")),
       page("stats", () => import("@/modules/stats/pages/StatsPage.vue")),
       page("tickets", () => import("@/modules/tickets/pages/TicketsPage.vue")),
       page("ticketDetail", () => import("@/modules/tickets/pages/TicketDetailPage.vue")),
@@ -50,6 +60,8 @@ const routes: RouteRecordRaw[] = [
       page("adminTicketDetail", () => import("@/modules/tickets/pages/TicketDetailPage.vue"), { requiresAdmin: true, adminMode: true }),
     ],
   },
+
+  ...legacyLibraryPaths.map(({ path, tab }) => ({ path, redirect: { name: routeProps.library.name, query: { tab } } })),
 
   page("notFound", () => import("@/pages/NotFoundPage.vue")),
 ];

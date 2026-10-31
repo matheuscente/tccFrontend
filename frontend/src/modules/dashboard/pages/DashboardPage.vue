@@ -35,7 +35,7 @@
           icon="mdi-clipboard-check-outline"
           color="info"
           :caption="`${performance?.totalAttempts ?? 0} tentativa(s)`"
-          :to="{ name: routeProps.activities.name }"
+          :to="libraryRoute('activities')"
         />
       </v-col>
     </v-row>
@@ -109,18 +109,27 @@
       <v-col cols="12" lg="5">
         <v-card class="h-100">
           <v-card-item>
-            <v-card-title class="text-title-large">Atalhos</v-card-title>
+            <v-card-title class="text-title-large">Meus cursos</v-card-title>
+            <v-card-subtitle>Abra um curso para ver tudo o que está nele</v-card-subtitle>
+            <template #append>
+              <v-btn variant="text" size="small" append-icon="mdi-chevron-right" :to="{ name: routeProps.courses.name }">Todos</v-btn>
+            </template>
           </v-card-item>
-          <v-card-text>
-            <v-row density="compact">
-              <v-col v-for="link in quickLinks" :key="link.title" cols="6">
-                <v-card variant="tonal" :color="link.color" :to="{ name: link.route }" class="pa-3 text-center">
-                  <v-icon :icon="link.icon" size="28" class="mb-1" />
-                  <div class="text-label-large">{{ link.title }}</div>
-                </v-card>
-              </v-col>
-            </v-row>
-          </v-card-text>
+          <v-list v-if="structure.courses.length" lines="two" class="pt-0">
+            <v-list-item
+              v-for="course in structure.courses.slice(0, 6)"
+              :key="course.id"
+              :to="{ name: routeProps.courseDetail.name, params: { id: course.id } }"
+              :title="course.title"
+              :subtitle="`${structure.modulesOf(course.id).length} módulo(s)`"
+            >
+              <template #prepend>
+                <v-avatar color="primary" variant="tonal" rounded="lg"><v-icon icon="mdi-school-outline" /></v-avatar>
+              </template>
+              <template #append><v-icon icon="mdi-chevron-right" /></template>
+            </v-list-item>
+          </v-list>
+          <v-card-text v-else class="text-body-medium text-medium-emphasis">Nenhum curso cadastrado.</v-card-text>
         </v-card>
       </v-col>
     </v-row>
@@ -147,6 +156,7 @@ import type { StudySummaryDTO } from "@/modules/stats/models/DTO/StudySummaryDto
 import { routeProps } from "@/router/RouteProps";
 import { formatMinutes, shortDay } from "@/utils/date";
 import { formatScore } from "@/utils/score";
+import { libraryRoute } from "@/modules/library/models/constants/library.constants";
 
 const auth = useAuthStore();
 const structure = useStructureStore();
@@ -185,15 +195,6 @@ const visibleGoals = computed(() => {
   const order = { IN_PROGRESS: 0, ACHIEVED: 1, NOT_STARTED: 2, EXPIRED: 3 } as const;
   return [...goals.value].sort((a, b) => order[a.status] - order[b.status]).slice(0, 5);
 });
-
-const quickLinks = [
-  { title: "Cursos", icon: "mdi-school-outline", route: routeProps.courses.name, color: "primary" },
-  { title: "Questões", icon: "mdi-help-box-multiple-outline", route: routeProps.questions.name, color: "secondary" },
-  { title: "Atividades", icon: "mdi-clipboard-check-outline", route: routeProps.activities.name, color: "info" },
-  { title: "Notas", icon: "mdi-notebook-outline", route: routeProps.notes.name, color: "warning" },
-  { title: "Arquivos", icon: "mdi-cloud-outline", route: routeProps.files.name, color: "success" },
-  { title: "Suporte", icon: "mdi-lifebuoy", route: routeProps.tickets.name, color: "error" },
-];
 
 const load = async () => {
   loading.value = true;

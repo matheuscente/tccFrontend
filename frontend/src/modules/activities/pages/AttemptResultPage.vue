@@ -5,7 +5,7 @@
     </div>
 
     <EmptyState v-else-if="!attempt" icon="mdi-alert-circle-outline" title="Resultado não encontrado">
-      <v-btn :to="{ name: routeProps.activities.name }">Voltar para as atividades</v-btn>
+      <v-btn :to="libraryRoute('activities')">Voltar para as atividades</v-btn>
     </EmptyState>
 
     <template v-else>
@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import { libraryRoute } from "@/modules/library/models/constants/library.constants";
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import PageHeader from "@/components/PageHeader.vue";

@@ -100,7 +100,7 @@
         text="Responda atividades avaliativas para acompanhar seu rendimento."
         icon="mdi-clipboard-check-outline"
       >
-        <v-btn color="primary" variant="tonal" :to="{ name: routeProps.activities.name }">Ver atividades</v-btn>
+        <v-btn color="primary" variant="tonal" :to="libraryRoute('activities')">Ver atividades</v-btn>
       </EmptyState>
 
       <template v-else>
@@ -166,6 +166,7 @@
 </template>
 
 <script setup lang="ts">
+import { libraryRoute } from "@/modules/library/models/constants/library.constants";
 import { computed, onMounted, ref, watch } from "vue";
 import PageHeader from "@/components/PageHeader.vue";
 import StatCard from "@/components/StatCard.vue";

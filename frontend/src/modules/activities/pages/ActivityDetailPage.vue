@@ -5,11 +5,11 @@
     </div>
 
     <EmptyState v-else-if="!activity" icon="mdi-alert-circle-outline" title="Atividade não encontrada">
-      <v-btn :to="{ name: routeProps.activities.name }">Voltar</v-btn>
+      <v-btn :to="libraryRoute('activities')">Voltar</v-btn>
     </EmptyState>
 
     <template v-else>
-      <PageHeader :title="activity.title" :back="{ name: routeProps.activities.name }">
+      <PageHeader :title="activity.title" :back="backRoute">
         <template #actions>
           <v-btn
             color="primary"
@@ -152,7 +152,7 @@
             />
           </v-card-text>
           <v-card-actions class="px-6 pb-4">
-            <v-btn variant="text" :to="{ name: routeProps.questions.name }">Ir ao banco de questões</v-btn>
+            <v-btn variant="text" :to="questionsRoute">Ir ao banco de questões</v-btn>
             <v-spacer />
             <v-btn variant="text" @click="addDialog = false">Cancelar</v-btn>
             <v-btn color="primary" variant="flat" :disabled="toAdd.length === 0" @click="confirmAdd">Adicionar {{ toAdd.length || "" }}</v-btn>
@@ -164,6 +164,8 @@
 </template>
 
 <script setup lang="ts">
+import { libraryRoute } from "@/modules/library/models/constants/library.constants";
+import { useHubRoute } from "@/composables/useHubRoute";
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import type { VForm } from "vuetify/components";
@@ -187,11 +189,15 @@ import QuestionPicker from "../components/QuestionPicker.vue";
 
 const route = useRoute();
 const auth = useAuthStore();
+const hubRoute = useHubRoute();
 const { run, runOne } = useApi();
 
 const id = computed(() => String(route.params.id));
 
 const activity = ref<ActivityDetailDTO | null>(null);
+// volta para onde a atividade está vinculada (página do curso, módulo ou disciplina)
+const backRoute = computed(() => (activity.value ? hubRoute(activity.value, "activities") : null) ?? libraryRoute("activities"));
+const questionsRoute = computed(() => (activity.value ? hubRoute(activity.value, "questions") : null) ?? libraryRoute("questions"));
 const attempts = ref<AttemptDTO[]>([]);
 const loading = ref(true);
 

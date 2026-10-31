@@ -7,5 +7,7 @@ declare module 'vue-router' {
         requiresAdmin?: boolean
         guestOnly?: boolean
         adminMode?: boolean
+        // tela de leitura sem menu lateral e sem barra superior
+        focus?: boolean
     }
 }

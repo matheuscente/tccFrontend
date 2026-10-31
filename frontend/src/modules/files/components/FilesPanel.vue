@@ -1,13 +1,6 @@
 <template>
   <div>
-    <PageHeader title="Meus arquivos" subtitle="Envie apostilas, vídeos, PDFs e outros materiais de estudo" />
-
-    <v-alert type="info" variant="tonal" density="compact" icon="mdi-shield-lock-outline" class="mb-4">
-      Seus arquivos são privados: somente você pode visualizá-los ou baixá-los (nem o administrador tem acesso).
-    </v-alert>
-
     <v-card class="mb-4">
-      <v-card-title class="text-title-medium pt-4 px-4">Enviar arquivos</v-card-title>
       <v-card-text>
         <div
           class="dropzone mb-4"
@@ -24,11 +17,13 @@
         >
           <v-icon icon="mdi-cloud-upload-outline" size="40" color="primary" class="mb-2" />
           <div class="text-body-large">Arraste arquivos aqui ou <span class="text-primary font-weight-medium">clique para selecionar</span></div>
-          <div class="text-body-small text-medium-emphasis">Até 100 MB por arquivo</div>
+          <div class="text-body-small text-medium-emphasis">
+            Até 100 MB por arquivo<template v-if="fixed"> · serão vinculados a <ScopeLabel :scope="fixedScope" /></template>
+          </div>
           <input ref="fileInput" type="file" multiple hidden @change="onPick" />
         </div>
 
-        <ScopeSelect v-model="uploadScope" label="Vincular os arquivos enviados a (opcional)" />
+        <ScopeSelect v-if="!fixed" v-model="uploadScope" label="Vincular os arquivos enviados a (opcional)" />
 
         <v-list v-if="queue.length" density="compact" class="mt-3 pa-0">
           <v-list-item v-for="item in queue" :key="item.key" class="px-0">
@@ -47,10 +42,10 @@
     <v-card>
       <v-card-text>
         <v-row density="compact" class="mb-2">
-          <v-col cols="12" md="9">
+          <v-col v-if="!fixed" cols="12" md="9">
             <ScopeSelect v-model="filterScope" />
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" :md="fixed ? 12 : 3">
             <v-text-field v-model="search" label="Buscar por nome" prepend-inner-icon="mdi-magnify" clearable hide-details />
           </v-col>
         </v-row>
@@ -59,7 +54,7 @@
           <v-progress-circular indeterminate color="primary" />
         </div>
 
-        <EmptyState v-else-if="files.length === 0" icon="mdi-cloud-outline" title="Nenhum arquivo encontrado" text="Envie seus materiais usando a área acima." />
+        <EmptyState v-else-if="files.length === 0" icon="mdi-cloud-outline" title="Nenhum material encontrado" text="Envie apostilas, vídeos, PDFs e outros materiais usando a área acima." />
 
         <v-table v-else density="comfortable" hover>
           <thead>
@@ -136,7 +131,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { VForm } from "vuetify/components";
-import PageHeader from "@/components/PageHeader.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import ScopeSelect from "@/components/ScopeSelect.vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
@@ -154,7 +148,11 @@ import { MAX_UPLOAD_SIZE } from "../models/constants/file.constants";
 import type { StoredFileDTO } from "../models/DTO/StoredFileDto";
 import { fileService } from "../services/file.service";
 import { fileIcon } from "../utils/fileKind";
-import FileViewerDialog from "../components/FileViewerDialog.vue";
+import FileViewerDialog from "./FileViewerDialog.vue";
+import { hasScope, scopeOf } from "@/utils/scope";
+
+const props = withDefaults(defineProps<{ scope?: Scope | null }>(), { scope: null });
+const emit = defineEmits<{ changed: [] }>();
 
 const auth = useAuthStore();
 const confirm = useConfirmStore();
@@ -188,15 +186,16 @@ const savingEdit = ref(false);
 
 const totalSize = computed(() => files.value.reduce((sum, file) => sum + file.size, 0));
 
-const scopeOf = (file: StoredFileDTO): Scope =>
-  file.disciplineId ? { disciplineId: file.disciplineId } : file.moduleId ? { moduleId: file.moduleId } : file.courseId ? { courseId: file.courseId } : {};
+const fixed = computed(() => hasScope(props.scope));
+const fixedScope = computed<Scope>(() => (fixed.value ? scopeOf(props.scope ?? {}) : {}));
 
 const load = async () => {
   if (!auth.userId) return;
   const request = latest.next();
   loading.value = true;
   try {
-    const data = await run(fileService.listByUser(auth.userId, { ...filterScope.value, search: search.value?.trim() || undefined }));
+    const scope = fixed.value ? fixedScope.value : filterScope.value;
+    const data = await run(fileService.listByUser(auth.userId, { ...scope, search: search.value?.trim() || undefined }));
     if (latest.isLatest(request)) files.value = data ?? [];
   } finally {
     if (latest.isLatest(request)) loading.value = false;
@@ -246,7 +245,7 @@ const processQueue = async () => {
     while ((item = queue.value.find((entry) => entry.status === "waiting"))) {
       const current = item;
       current.status = "uploading";
-      const response = await fileService.upload(current.file, uploadScope.value, (percent) => { current.progress = percent; });
+      const response = await fileService.upload(current.file, fixed.value ? fixedScope.value : uploadScope.value, (percent) => { current.progress = percent; });
       if (isError(response)) {
         current.status = "error";
         current.error = firstErrorMessage(response);
@@ -261,6 +260,7 @@ const processQueue = async () => {
   }
   if (uploaded) {
     notify.success(uploaded === 1 ? "Arquivo enviado." : `${uploaded} arquivos enviados.`);
+    emit("changed");
     await load();
     clearTimeout(cleanupTimer);
     cleanupTimer = setTimeout(() => { queue.value = queue.value.filter((entry) => entry.status !== "done"); }, 3000);
@@ -309,6 +309,7 @@ const saveEdit = async () => {
     }), "Arquivo atualizado.");
     if (updated) {
       editOpen.value = false;
+      emit("changed");
       await load();
     }
   } finally {
@@ -319,7 +320,10 @@ const saveEdit = async () => {
 const remove = async (file: StoredFileDTO) => {
   const ok = await confirm.ask({ title: "Excluir arquivo", message: `Excluir "${file.originalName}" definitivamente?`, confirmText: "Excluir" });
   if (!ok) return;
-  if (await run(fileService.remove(file.id), "Arquivo excluído.")) await load();
+  if (await run(fileService.remove(file.id), "Arquivo excluído.")) {
+    emit("changed");
+    await load();
+  }
 };
 
 onMounted(load);

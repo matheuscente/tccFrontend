@@ -1,5 +1,5 @@
 <template>
-  <v-navigation-drawer v-model="drawer" :rail="rail && !mobile" :permanent="!mobile" :temporary="mobile" width="264">
+  <v-navigation-drawer v-if="!focus" v-model="drawer" :rail="rail && !mobile" :permanent="!mobile" :temporary="mobile" width="264">
     <div class="d-flex align-center px-4 py-4 ga-3">
       <v-avatar color="primary" size="36" rounded="lg">
         <v-icon icon="mdi-book-education-outline" color="on-primary" />
@@ -14,18 +14,20 @@
         <v-list-subheader v-if="!rail || mobile">{{ group.title }}</v-list-subheader>
         <v-list-item
           v-for="item in group.items"
-          :key="item.title"
-          :to="{ name: item.route }"
+          :key="item.key"
+          :to="item.to"
           :prepend-icon="item.icon"
           :title="item.title"
           :exact="item.exact ?? false"
+          :class="{ 'ml-3': item.nested && (!rail || mobile) }"
           rounded="lg"
         />
       </template>
     </v-list>
   </v-navigation-drawer>
 
-  <v-app-bar flat border="b" density="comfortable">
+  <v-app-bar v-if="!focus" flat border="b" density="comfortable">
+    <v-progress-linear :active="navigating" indeterminate color="primary" absolute location="bottom" height="2" />
     <v-app-bar-nav-icon aria-label="Alternar menu lateral" @click="toggleDrawer" />
 
     <v-app-bar-title class="text-title-medium">{{ route.meta.title }}</v-app-bar-title>
@@ -63,9 +65,9 @@
   </v-app-bar>
 
   <v-main>
-    <v-container fluid class="pa-4 pa-md-6 max-w-page">
+    <v-container fluid :class="focus ? 'pa-0' : 'pa-4 pa-md-6 max-w-page'">
       <router-view v-if="ready" v-slot="{ Component }">
-        <component :is="Component" :key="route.fullPath" />
+        <component :is="Component" :key="route.path" />
       </router-view>
       <div v-else class="d-flex justify-center pa-12">
         <v-progress-circular indeterminate color="primary" />
@@ -76,7 +78,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 import { useDisplay, useTheme } from "vuetify";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useStructureStore } from "@/stores/structure.store";
@@ -86,6 +88,7 @@ import { formatDuration } from "@/utils/date";
 import { writeStorage } from "@/utils/storage";
 
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const structure = useStructureStore();
 const timer = useTimerStore();
@@ -95,8 +98,25 @@ const { mobile } = useDisplay();
 const drawer = ref(true);
 const ready = ref(false);
 const rail = ref(false);
+const navigating = ref(false);
+
+// indicador de carregamento enquanto a próxima tela é baixada
+let navigationTimer: ReturnType<typeof setTimeout> | undefined;
+const stopBefore = router.beforeEach(() => {
+  clearTimeout(navigationTimer);
+  navigationTimer = setTimeout(() => { navigating.value = true; }, 120);
+});
+const stopAfter = router.afterEach(() => {
+  clearTimeout(navigationTimer);
+  navigating.value = false;
+});
+const stopError = router.onError(() => {
+  clearTimeout(navigationTimer);
+  navigating.value = false;
+});
 
 const isDark = computed(() => theme.global.current.value.dark);
+const focus = computed(() => !!route.meta.focus);
 
 const toggleTheme = () => {
   const next = isDark.value ? "light" : "dark";
@@ -120,37 +140,38 @@ const initials = computed(() => {
   return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "")).toUpperCase();
 });
 
-interface MenuItem { title: string, icon: string, route: string, exact?: boolean }
+interface MenuItem { key: string, title: string, icon: string, to: RouteLocationRaw, exact?: boolean, nested?: boolean }
+
+const item = (title: string, icon: string, name: string, extra: Partial<MenuItem> = {}): MenuItem => ({ key: name, title, icon, to: { name }, ...extra });
 
 const menu = computed(() => {
   const groups: { title: string, items: MenuItem[] }[] = [
     {
       title: "Estudos",
       items: [
-        { title: "Início", icon: "mdi-view-dashboard-outline", route: routeProps.home.name },
-        { title: "Cursos", icon: "mdi-school-outline", route: routeProps.courses.name },
-        { title: "Sessões de estudo", icon: "mdi-timer-outline", route: routeProps.study.name },
-        { title: "Metas", icon: "mdi-flag-checkered", route: routeProps.goals.name },
-        { title: "Estatísticas", icon: "mdi-chart-box-outline", route: routeProps.stats.name },
+        item("Início", "mdi-view-dashboard-outline", routeProps.home.name),
+        item("Meus cursos", "mdi-school-outline", routeProps.courses.name, { exact: true }),
+        ...structure.courses.map((course) => ({
+          key: course.id,
+          title: course.title,
+          icon: "mdi-book-education-outline",
+          to: { name: routeProps.courseDetail.name, params: { id: course.id } },
+          nested: true,
+        })),
+        item("Biblioteca", "mdi-bookshelf", routeProps.library.name),
       ],
     },
     {
-      title: "Avaliações",
+      title: "Acompanhamento",
       items: [
-        { title: "Banco de questões", icon: "mdi-help-box-multiple-outline", route: routeProps.questions.name },
-        { title: "Atividades", icon: "mdi-clipboard-check-outline", route: routeProps.activities.name },
-      ],
-    },
-    {
-      title: "Materiais",
-      items: [
-        { title: "Bloco de notas", icon: "mdi-notebook-outline", route: routeProps.notes.name },
-        { title: "Arquivos", icon: "mdi-cloud-outline", route: routeProps.files.name },
+        item("Sessões de estudo", "mdi-timer-outline", routeProps.study.name),
+        item("Metas", "mdi-flag-checkered", routeProps.goals.name),
+        item("Estatísticas", "mdi-chart-box-outline", routeProps.stats.name),
       ],
     },
     {
       title: "Ajuda",
-      items: [{ title: "Suporte (SAC)", icon: "mdi-lifebuoy", route: routeProps.tickets.name }],
+      items: [item("Suporte (SAC)", "mdi-lifebuoy", routeProps.tickets.name)],
     },
   ];
 
@@ -158,9 +179,9 @@ const menu = computed(() => {
     groups.push({
       title: "Administração",
       items: [
-        { title: "Painel", icon: "mdi-shield-crown-outline", route: routeProps.adminDashboard.name, exact: true },
-        { title: "Usuários", icon: "mdi-account-group-outline", route: routeProps.adminUsers.name },
-        { title: "Chamados", icon: "mdi-headset", route: routeProps.adminTickets.name },
+        item("Painel", "mdi-shield-crown-outline", routeProps.adminDashboard.name, { exact: true }),
+        item("Usuários", "mdi-account-group-outline", routeProps.adminUsers.name),
+        item("Chamados", "mdi-headset", routeProps.adminTickets.name),
       ],
     });
   }
@@ -176,6 +197,10 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  stopBefore();
+  stopAfter();
+  stopError();
+  clearTimeout(navigationTimer);
   timer.reset();
   structure.clear();
 });

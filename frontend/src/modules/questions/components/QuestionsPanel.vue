@@ -1,18 +1,12 @@
 <template>
   <div>
-    <PageHeader title="Banco de questões" subtitle="Cadastre questões e use-as para montar suas atividades avaliativas">
-      <template #actions>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Nova questão</v-btn>
-      </template>
-    </PageHeader>
-
     <v-card class="mb-4">
       <v-card-text>
-        <v-row density="compact">
-          <v-col cols="12" md="9">
+        <v-row density="compact" align="center">
+          <v-col v-if="!fixed" cols="12" md="7">
             <ScopeSelect v-model="filterScope" />
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" :md="fixed ? 9 : 3">
             <v-text-field
               v-model="search"
               label="Buscar no enunciado"
@@ -20,6 +14,9 @@
               clearable
               hide-details
             />
+          </v-col>
+          <v-col cols="12" :md="fixed ? 3 : 2">
+            <v-btn block color="primary" prepend-icon="mdi-plus" @click="openCreate">Nova questão</v-btn>
           </v-col>
         </v-row>
       </v-card-text>
@@ -49,7 +46,7 @@
                 <v-chip size="x-small" variant="tonal" :color="question.type === 'TRUE_FALSE' ? 'secondary' : 'primary'">
                   {{ questionTypeLabels[question.type] }}
                 </v-chip>
-                <ScopeLabel :scope="question" />
+                <ScopeLabel v-if="!fixed || !sameScope(scopeOf(question), fixedScope)" :scope="question" />
               </div>
             </div>
           </v-expansion-panel-title>
@@ -86,13 +83,12 @@
       </v-expansion-panels>
     </template>
 
-    <QuestionFormDialog v-model="dialog" :question="editing" :default-scope="filterScope" @saved="load" />
+    <QuestionFormDialog v-model="dialog" :question="editing" :default-scope="fixed ? fixedScope : filterScope" @saved="onSaved" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import PageHeader from "@/components/PageHeader.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import ScopeSelect from "@/components/ScopeSelect.vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
@@ -104,7 +100,11 @@ import { useLatest } from "@/composables/useLatest";
 import { questionTypeLabels } from "../models/constants/question.constants";
 import type { QuestionDTO } from "../models/DTO/QuestionDto";
 import { questionService } from "../services/question.service";
-import QuestionFormDialog from "../components/QuestionFormDialog.vue";
+import QuestionFormDialog from "./QuestionFormDialog.vue";
+import { hasScope, sameScope, scopeOf } from "@/utils/scope";
+
+const props = withDefaults(defineProps<{ scope?: Scope | null }>(), { scope: null });
+const emit = defineEmits<{ changed: [] }>();
 
 const auth = useAuthStore();
 const confirm = useConfirmStore();
@@ -118,14 +118,17 @@ const search = ref<string | null>("");
 const dialog = ref(false);
 const editing = ref<QuestionDTO | null>(null);
 
-const hasFilter = computed(() => !!(search.value || filterScope.value.courseId || filterScope.value.moduleId || filterScope.value.disciplineId));
+const fixed = computed(() => hasScope(props.scope));
+const fixedScope = computed<Scope>(() => (fixed.value ? scopeOf(props.scope ?? {}) : {}));
+const hasFilter = computed(() => !!search.value || (!fixed.value && hasScope(filterScope.value)));
 
 const load = async () => {
   if (!auth.userId) return;
   const request = latest.next();
   loading.value = true;
   try {
-    const data = await run(questionService.listByUser(auth.userId, { ...filterScope.value, search: search.value?.trim() || undefined }));
+    const scope = fixed.value ? fixedScope.value : filterScope.value;
+    const data = await run(questionService.listByUser(auth.userId, { ...scope, search: search.value?.trim() || undefined }));
     if (latest.isLatest(request)) questions.value = data ?? [];
   } finally {
     if (latest.isLatest(request)) loading.value = false;
@@ -138,6 +141,11 @@ watch(search, () => {
   timeout = setTimeout(load, 400);
 });
 watch(filterScope, load, { deep: true });
+
+const onSaved = async () => {
+  emit("changed");
+  await load();
+};
 
 const openCreate = () => {
   editing.value = null;
@@ -157,7 +165,10 @@ const remove = async (question: QuestionDTO) => {
   });
   if (!ok) return;
   const result = await run(questionService.remove(question.id), "Questão excluída.");
-  if (result) await load();
+  if (result) {
+    emit("changed");
+    await load();
+  }
 };
 
 onMounted(load);

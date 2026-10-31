@@ -70,6 +70,23 @@ export const useStructureStore = defineStore("structure", {
       this.requestedFor = null;
     },
 
+    // ids de todos os níveis acima do vínculo (a API grava só o mais específico)
+    resolve(scope: Scope): Required<Scope> {
+      const discipline = this.disciplineById(scope.disciplineId);
+      const moduleId = scope.moduleId ?? discipline?.moduleId ?? null;
+      const courseId = scope.courseId ?? this.moduleById(moduleId)?.courseId ?? null;
+      return { courseId, moduleId, disciplineId: scope.disciplineId ?? null };
+    },
+
+    // o item pertence ao escopo ou a algum nível dentro dele
+    contains(container: Scope, item: Scope): boolean {
+      const resolved = this.resolve(item);
+      if (container.disciplineId) return resolved.disciplineId === container.disciplineId;
+      if (container.moduleId) return resolved.moduleId === container.moduleId;
+      if (container.courseId) return resolved.courseId === container.courseId;
+      return true;
+    },
+
     describe(scope: Scope): { level: ScopeLevel | null, path: string[] } {
       if (scope.disciplineId) {
         const discipline = this.disciplineById(scope.disciplineId);

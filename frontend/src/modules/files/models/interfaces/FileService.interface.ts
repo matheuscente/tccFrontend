@@ -7,7 +7,7 @@ import type { UpdateFileDTO } from "../DTO/UpdateFileDto";
 
 export interface FileServiceInterface {
   listByUser(userId: string, filter?: ScopeFilterDTO): Promise<ApiResult<StoredFileDTO>>
-  upload(file: File, scope: Scope, onProgress?: (percent: number) => void): Promise<ApiResult<StoredFileDTO>>
+  upload(file: File, scope: Scope, onProgress?: (percent: number) => void, position?: number): Promise<ApiResult<StoredFileDTO>>
   access(id: string): Promise<ApiResult<FileAccessDTO>>
   update(id: string, data: UpdateFileDTO): Promise<ApiResult<StoredFileDTO>>
   remove(id: string): Promise<ApiResult<unknown>>

@@ -19,10 +19,10 @@ export class FileService implements FileServiceInterface {
     return this.api.get<StoredFileDTO>(`/files/user/${userId}`, { params: cleanParams(filter) });
   }
 
-  upload(file: File, scope: Scope, onProgress?: (percent: number) => void) {
+  upload(file: File, scope: Scope, onProgress?: (percent: number) => void, position?: number) {
     const form = new FormData();
     form.append("file", file);
-    Object.entries(cleanParams(scope)).forEach(([key, value]) => form.append(key, String(value)));
+    Object.entries(cleanParams({ ...scope, position })).forEach(([key, value]) => form.append(key, String(value)));
 
     return this.api.post<StoredFileDTO>("/files", form, {
       onUploadProgress: (event) => {

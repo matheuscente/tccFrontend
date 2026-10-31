@@ -1,26 +1,25 @@
 <template>
   <div>
-    <PageHeader title="Atividades avaliativas" subtitle="Monte provas e exercícios de revisão com as questões do seu banco">
-      <template #actions>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Nova atividade</v-btn>
-      </template>
-    </PageHeader>
+    <div class="d-flex flex-wrap align-center ga-3 mb-4">
+      <div class="text-body-medium text-medium-emphasis flex-grow-1">Provas e exercícios de revisão montados com as questões do banco.</div>
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Nova atividade</v-btn>
+    </div>
 
     <div v-if="loading" class="d-flex justify-center pa-8">
       <v-progress-circular indeterminate color="primary" />
     </div>
 
     <EmptyState
-      v-else-if="activities.length === 0"
+      v-else-if="visible.length === 0"
       icon="mdi-clipboard-check-outline"
       title="Nenhuma atividade criada"
-      text="Crie uma atividade para avaliar um curso, módulo ou disciplina."
+      :text="fixed ? 'Crie uma atividade com as questões deste conteúdo.' : 'Crie uma atividade para avaliar um curso, módulo ou disciplina.'"
     >
       <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Criar atividade</v-btn>
     </EmptyState>
 
     <v-row v-else>
-      <v-col v-for="activity in activities" :key="activity.id" cols="12" sm="6" lg="4">
+      <v-col v-for="activity in visible" :key="activity.id" cols="12" sm="6" lg="4">
         <v-card class="h-100 d-flex flex-column">
           <v-card-item>
             <v-card-title class="text-title-medium text-wrap">{{ activity.title }}</v-card-title>
@@ -109,13 +108,13 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import type { VForm } from "vuetify/components";
-import PageHeader from "@/components/PageHeader.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import ScopeSelect from "@/components/ScopeSelect.vue";
 import ScopeLabel from "@/components/ScopeLabel.vue";
 import { useApi } from "@/composables/useApi";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { useConfirmStore } from "@/stores/confirm.store";
+import { useStructureStore } from "@/stores/structure.store";
 import { useNotifyStore } from "@/stores/notify.store";
 import { isError } from "@/services/api/isError.typeGuard";
 import { firstErrorMessage } from "@/utils/apiErrors";
@@ -128,9 +127,14 @@ import type { QuestionDTO } from "@/modules/questions/models/DTO/QuestionDto";
 import { questionService } from "@/modules/questions/services/question.service";
 import type { ActivityDTO } from "../models/DTO/ActivityDto";
 import { activityService } from "../services/activity.service";
-import QuestionPicker from "../components/QuestionPicker.vue";
+import QuestionPicker from "./QuestionPicker.vue";
+import { hasScope as isScoped, scopeOf } from "@/utils/scope";
+
+const props = withDefaults(defineProps<{ scope?: Scope | null }>(), { scope: null });
+const emit = defineEmits<{ changed: [] }>();
 
 const auth = useAuthStore();
+const structure = useStructureStore();
 const confirm = useConfirmStore();
 const notify = useNotifyStore();
 const router = useRouter();
@@ -151,7 +155,9 @@ const loadingQuestions = ref(false);
 const saving = ref(false);
 const error = ref<string>();
 
-const hasScope = computed(() => !!(scope.value.courseId || scope.value.moduleId || scope.value.disciplineId));
+const hasScope = computed(() => isScoped(scope.value));
+const fixed = computed(() => isScoped(props.scope));
+const visible = computed(() => (fixed.value ? activities.value.filter((activity) => structure.contains(props.scope ?? {}, activity)) : activities.value));
 
 const load = async () => {
   if (!auth.userId) return;
@@ -181,9 +187,8 @@ watch(scope, async () => {
 const openCreate = () => {
   title.value = "";
   description.value = "";
-  scope.value = {};
+  scope.value = fixed.value ? scopeOf(props.scope ?? {}) : {};
   selected.value = [];
-  available.value = [];
   error.value = undefined;
   dialog.value = true;
 };
@@ -209,6 +214,7 @@ const create = async () => {
     }
     notify.success("Atividade criada.");
     dialog.value = false;
+    emit("changed");
     const created = response.data[0];
     if (created && created.questionCount === 0) {
       router.push({ name: routeProps.activityDetail.name, params: { id: created.id } });
@@ -227,7 +233,10 @@ const remove = async (activity: ActivityDTO) => {
     confirmText: "Excluir",
   });
   if (!ok) return;
-  if (await run(activityService.remove(activity.id), "Atividade excluída.")) await load();
+  if (await run(activityService.remove(activity.id), "Atividade excluída.")) {
+    emit("changed");
+    await load();
+  }
 };
 
 onMounted(load);

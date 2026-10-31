@@ -100,7 +100,7 @@ import { splitApiErrors } from "@/utils/apiErrors";
 import { inputToApiDate, isoToInputDate, todayInput } from "@/utils/date";
 import { maxLength, minLength, required } from "@/utils/rules";
 
-const props = withDefaults(defineProps<{ modelValue: boolean, goal?: GoalDTO | null }>(), { goal: null });
+const props = withDefaults(defineProps<{ modelValue: boolean, goal?: GoalDTO | null, defaultScope?: Scope }>(), { goal: null, defaultScope: () => ({}) });
 const emit = defineEmits<{ "update:modelValue": [value: boolean], saved: [] }>();
 
 const typeItems = (Object.keys(goalTypeLabels) as GoalType[]).map((value) => ({ value, title: goalTypeLabels[value] }));
@@ -145,7 +145,7 @@ watch(() => props.modelValue, (open) => {
   data.minutes = goal ? goal.targetMinutes % 60 : 0;
   data.startDate = goal ? isoToInputDate(goal.startDate) : todayInput();
   data.endDate = goal ? isoToInputDate(goal.endDate) : "";
-  data.scope = {};
+  data.scope = { ...props.defaultScope };
   form.value?.resetValidation();
 });
 

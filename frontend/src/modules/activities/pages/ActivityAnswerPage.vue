@@ -5,7 +5,7 @@
     </div>
 
     <EmptyState v-else-if="!activity" icon="mdi-alert-circle-outline" title="Não foi possível abrir a atividade">
-      <v-btn :to="{ name: routeProps.activities.name }">Voltar para as atividades</v-btn>
+      <v-btn :to="libraryRoute('activities')">Voltar para as atividades</v-btn>
     </EmptyState>
 
     <EmptyState
@@ -94,6 +94,7 @@
 </template>
 
 <script setup lang="ts">
+import { libraryRoute } from "@/modules/library/models/constants/library.constants";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import PageHeader from "@/components/PageHeader.vue";
