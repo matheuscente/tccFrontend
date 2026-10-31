@@ -22,15 +22,15 @@ A origem do front precisa estar em `CORS_ORIGINS` no `.env` da API (padrão `htt
 src/
 ├── main.ts              cria o app, restaura a sessão e só então monta o router
 ├── App.vue              <v-app> + snackbar e diálogo de confirmação globais
-├── layouts/AppLayout    menu lateral, barra superior, cronômetro e tema
+├── layouts/AppLayout    menu lateral, barra superior, cronômetro e tema (rotas com meta.focus escondem menu e barra)
 ├── router/              RouteProps (nomes/caminhos), routes, guardas
 ├── services/
 │   ├── abstract/        Service: get/post/put/patch/delete devolvendo ApiResult
 │   └── api/             instância do axios, interceptors, type guards e modelos da resposta
 ├── stores/              estado global: estrutura de cursos, notificações, confirmação
-├── composables/         useApi, useLatest, useLeaveGuard, useScopeContent, useHubRoute
-├── components/          ScopeSelect, ScopeLabel, PageHeader, StatCard, EmptyState, gráficos
-├── utils/               datas, regras de validação, erros da API, parâmetros, notas
+├── composables/         useApi, useLatest, useLeaveGuard, useScopeContent, useHubRoute, useReaderRoute
+├── components/          ScopeSelect, ScopeLabel, PageHeader, StatCard, EmptyState, MarkdownView, MarkdownEditor, gráficos
+├── utils/               datas, regras de validação, erros da API, parâmetros, notas, escopo, Markdown
 └── modules/<módulo>/
     ├── models/DTO/          tipos das requisições e respostas
     ├── models/Types/        uniões de valores (ex.: TicketStatus)
@@ -38,6 +38,7 @@ src/
     ├── models/interfaces/   contrato do service do módulo
     ├── services/            classe do service (ex.: CourseService) e sua instância
     ├── stores/              stores do módulo (auth, cronômetro)
+    ├── utils/               funções do módulo (ex.: study/utils/readerOrder.ts, files/utils/fileKind.ts)
     ├── components/          componentes do módulo (inclusive os painéis reaproveitados em várias telas)
     └── pages/               telas
 ```
@@ -81,9 +82,9 @@ sequenceDiagram
 
 | Tela | Rota | O que faz |
 |---|---|---|
-| Início | `/dashboard` | Tempo estudado hoje e na semana, sequência, média nas atividades, cronômetro, gráfico de 14 dias, metas |
+| Início | `/dashboard` | Tempo estudado hoje e na semana, sequência, média nas atividades, cronômetro, gráfico de 14 dias, metas e a lista "Meus cursos" |
 | Cursos | `/courses` | Lista e CRUD de cursos |
-| Página de estudo | `/courses/:id`, `/courses/:id/modules/:moduleId`, `/courses/:id/modules/:moduleId/disciplines/:disciplineId` | Centraliza tudo o que está vinculado ao curso, módulo ou disciplina (e aos níveis dentro dele): visão geral, materiais, notas, questões, atividades, metas e sessões, em abas (`?tab=`). A árvore lateral troca o nível mantendo a aba; "Estudar agora" inicia o cronômetro no nível aberto |
+| Página de estudo | `/courses/:id`, `/courses/:id/modules/:moduleId`, `/courses/:id/modules/:moduleId/disciplines/:disciplineId` | Centraliza tudo o que está vinculado ao curso, módulo ou disciplina (e aos níveis dentro dele): visão geral, materiais, notas, questões, atividades, metas e sessões, em abas (`?tab=`). A árvore lateral troca o nível mantendo a aba. "Estudar" abre o modo estudo do nível; "Cronômetro" inicia a sessão sem sair da página (vira "Finalizar estudo" enquanto roda) |
 | Modo estudo | `/courses/:id/study`, `.../modules/:moduleId/study`, `.../disciplines/:disciplineId/study` | Tela limpa (sem menu) para estudar o nível aberto: notas (Markdown) e materiais em sequência, na ordem de inclusão, com seções por módulo e disciplina. Entre os itens, o botão **+** insere uma nota ou um material naquela posição. No computador (≥ 1280 px) a lista fica à esquerda e o painel da direita mostra em cima o vídeo/PDF/áudio escolhido e embaixo a imagem escolhida; no celular tudo aparece em linha e o vídeo em reprodução vira um mini player no canto ao rolar a página. Tem sumário, cronômetro e "Praticar" com as atividades de cada seção |
 | Biblioteca | `/library?tab=files\|notes\|questions\|activities` | Os mesmos painéis sem filtro fixo: tudo de todos os cursos e o que está sem vínculo. `/files`, `/notes`, `/questions` e `/activities` redirecionam para a aba correspondente |
 | Sessões de estudo | `/study` | Cronômetro, registro manual e histórico (editar/excluir) |
@@ -93,6 +94,16 @@ sequenceDiagram
 | Suporte | `/support`, `/support/:id` | Abrir chamado com imagens e conversar com o suporte |
 | Perfil | `/profile` | Dados, troca de senha e exclusão da conta |
 | Painel admin | `/admin`, `/admin/users`, `/admin/users/:id`, `/admin/tickets` | Indicadores, usuários, acompanhamento do aluno e atendimento dos chamados |
+
+### Menu lateral
+Estudos (Início, Meus cursos com cada curso listado, Biblioteca), Acompanhamento (Sessões de estudo, Metas, Estatísticas), Ajuda (Suporte) e, para o perfil ADMIN, Administração (Painel, Usuários, Chamados).
+
+### Fluxo do modo estudo
+1. A página do curso/módulo/disciplina monta o endereço com `useReaderRoute(escopo)`; a rota tem `meta.focus`, então o `AppLayout` some com o menu e a barra.
+2. `StudyReaderPage` busca notas e arquivos com o escopo (a API já inclui os níveis de dentro) e todas as atividades, filtradas por `structure.contains`.
+3. Monta as seções na ordem da estrutura (curso → módulos → disciplinas). Dentro de cada seção, ordena por `position ?? createdAt`.
+4. Cada `ReaderInsert` (o **+**) conhece a posição do item de antes e do de depois e envia a média como `position` ao criar a nota ou enviar o arquivo.
+5. `FileInline` só pede o link temporário quando o material chega perto da tela. Com `floatable`, o vídeo em reprodução vira mini player ao sair da tela; com `eager`/`fill`, carrega na hora e ocupa o painel lateral (computador).
 
 ### Comportamentos comuns
 - **Painéis com escopo**: `FilesPanel`, `NotesPanel`, `QuestionsPanel`, `ActivitiesPanel`, `GoalsPanel` e `StudySessionsPanel` recebem a prop `scope`. Com escopo, listam só o conteúdo daquele nível (e dos níveis dentro dele) e já criam os itens vinculados a ele; sem escopo, mostram tudo com os filtros. Ao alterar algo emitem `changed`, e a página de estudo atualiza os contadores das abas.
