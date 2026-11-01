@@ -34,12 +34,16 @@ export class TicketService implements TicketServiceInterface {
     return this.api.post<TicketDetailDTO>("/tickets", toForm({ ...data }, images));
   }
 
-  reply(id: string, message: string, images: File[]) {
-    return this.api.post<TicketDetailDTO>(`/tickets/${id}/messages`, toForm({ message }, images));
+  reply(id: string, message: string, images: File[], keepInProgress = false) {
+    return this.api.post<TicketDetailDTO>(`/tickets/${id}/messages`, toForm({ message, ...(keepInProgress ? { keepInProgress: "true" } : {}) }, images));
   }
 
   updateStatus(id: string, status: TicketStatus) {
     return this.api.patch<TicketDetailDTO>(`/tickets/${id}/status`, { status });
+  }
+
+  transfer(id: string, adminId: string) {
+    return this.api.patch<TicketDetailDTO>(`/tickets/${id}/transfer`, { adminId });
   }
 }
 

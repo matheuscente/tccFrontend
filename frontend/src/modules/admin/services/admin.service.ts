@@ -6,6 +6,7 @@ import type { PaginatedUsersDTO, UserResponseDTO } from "@/modules/user/models/D
 import type { UserRole } from "@/modules/user/models/Types/UserRole";
 import type { AdminDashboardDTO } from "../models/DTO/AdminDashboardDto";
 import type { AdminUserOverviewDTO } from "../models/DTO/AdminUserOverviewDto";
+import type { AdminSummaryDTO } from "../models/DTO/AdminSummaryDto";
 import type { AdminServiceInterface } from "../models/interfaces/AdminService.interface";
 
 export class AdminService implements AdminServiceInterface {
@@ -17,6 +18,10 @@ export class AdminService implements AdminServiceInterface {
 
   dashboard() {
     return this.api.get<AdminDashboardDTO>("/admin/dashboard");
+  }
+
+  listAdmins() {
+    return this.api.get<AdminSummaryDTO>("/admin/admins");
   }
 
   userOverview(id: string) {

@@ -1,5 +1,6 @@
 import type { UserRole } from "@/modules/user/models/Types/UserRole";
 import type { TicketDTO } from "./TicketDto";
+import type { TicketEventDTO } from "./TicketEventDto";
 
 export interface TicketAttachmentDTO {
   id: string
@@ -19,4 +20,5 @@ export interface TicketMessageDTO {
 
 export interface TicketDetailDTO extends Omit<TicketDTO, "messageCount" | "lastMessageAt" | "lastMessageByAdmin"> {
   messages: TicketMessageDTO[]
+  events: TicketEventDTO[]
 }

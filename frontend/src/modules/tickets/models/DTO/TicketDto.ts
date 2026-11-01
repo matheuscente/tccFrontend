@@ -13,6 +13,9 @@ export interface TicketDTO {
   category: TicketCategory
   status: TicketStatus
   user: TicketUserDTO
+  assignedTo: { id: string, name: string } | null
+  // bySupport: quem encerrou foi um administrador (e não o dono do chamado)
+  closedBy: { id: string, name: string, bySupport: boolean } | null
   messageCount: number
   lastMessageAt: string | null
   lastMessageByAdmin: boolean

@@ -2,7 +2,7 @@
   <div>
     <PageHeader
       :title="adminMode ? 'Chamados' : 'Suporte (SAC)'"
-      :subtitle="adminMode ? 'Atendimento das solicitações dos usuários' : 'Envie dúvidas, problemas técnicos ou sugestões'"
+      :subtitle="adminMode ? 'Chamados em atendimento ficam visíveis só para o administrador responsável' : 'Envie dúvidas, problemas técnicos ou sugestões'"
     >
       <template #actions>
         <v-btn v-if="!adminMode" color="primary" prepend-icon="mdi-plus" @click="dialog = true">Novo chamado</v-btn>
@@ -22,6 +22,9 @@
             :prepend-icon="ticketStatusInfo[key].icon"
           >
             {{ ticketStatusInfo[key].label }} ({{ counts[key] }})
+          </v-chip>
+          <v-chip v-if="adminMode" value="MINE" variant="outlined" filter prepend-icon="mdi-account-check-outline">
+            Meus atendimentos ({{ mine.length }})
           </v-chip>
         </v-chip-group>
         <v-text-field
@@ -69,6 +72,13 @@
           <v-chip size="small" :color="ticketStatusInfo[item.status].color" :prepend-icon="ticketStatusInfo[item.status].icon" variant="tonal">
             {{ ticketStatusInfo[item.status].label }}
           </v-chip>
+          <div v-if="item.status === 'CLOSED' && item.closedBy" class="text-body-small text-medium-emphasis mt-1">
+            {{ item.closedBy.bySupport ? "pelo suporte" : "pelo usuário" }}
+          </div>
+        </template>
+        <template #[`item.assignedTo`]="{ item }">
+          <span v-if="item.status === 'IN_PROGRESS' && item.assignedTo">{{ item.assignedTo.id === auth.userId ? "Você" : item.assignedTo.name }}</span>
+          <span v-else class="text-medium-emphasis">—</span>
         </template>
         <template #[`item.user`]="{ item }">
           <div>{{ item.user.name }}</div>
@@ -109,7 +119,7 @@ const statusKeys = Object.keys(ticketStatusInfo) as TicketStatus[];
 
 const tickets = ref<TicketDTO[]>([]);
 const loading = ref(false);
-const status = ref<TicketStatus | null>(null);
+const status = ref<TicketStatus | "MINE" | null>(null);
 const search = ref<string | null>("");
 const dialog = ref(false);
 
@@ -118,6 +128,7 @@ const headers = computed(() => [
   { title: "Categoria", key: "category", sortable: true },
   ...(adminMode.value ? [{ title: "Usuário", key: "user", sortable: false }] : []),
   { title: "Status", key: "status", sortable: true },
+  ...(adminMode.value ? [{ title: "Responsável", key: "assignedTo", sortable: false }] : []),
   { title: "Última interação", key: "updatedAt", sortable: true, value: (item: TicketDTO) => item.lastMessageAt ?? item.updatedAt },
 ]);
 
@@ -127,10 +138,13 @@ const counts = computed(() => {
   return result;
 });
 
+const mine = computed(() => tickets.value.filter((ticket) => ticket.status === "IN_PROGRESS" && ticket.assignedTo?.id === auth.userId));
+
 const filtered = computed(() => {
   const term = (search.value ?? "").trim().toLowerCase();
   return tickets.value.filter((ticket) => {
-    if (status.value && ticket.status !== status.value) return false;
+    if (status.value === "MINE" && !mine.value.includes(ticket)) return false;
+    if (status.value && status.value !== "MINE" && ticket.status !== status.value) return false;
     if (!term) return true;
     return ticket.subject.toLowerCase().includes(term)
       || ticket.user.name.toLowerCase().includes(term)

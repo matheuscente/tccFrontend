@@ -9,6 +9,7 @@ export interface TicketServiceInterface {
   list(filter?: TicketFilterDTO): Promise<ApiResult<TicketDTO>>
   findById(id: string): Promise<ApiResult<TicketDetailDTO>>
   create(data: CreateTicketDTO, images: File[]): Promise<ApiResult<TicketDetailDTO>>
-  reply(id: string, message: string, images: File[]): Promise<ApiResult<TicketDetailDTO>>
+  reply(id: string, message: string, images: File[], keepInProgress?: boolean): Promise<ApiResult<TicketDetailDTO>>
   updateStatus(id: string, status: TicketStatus): Promise<ApiResult<TicketDetailDTO>>
+  transfer(id: string, adminId: string): Promise<ApiResult<TicketDetailDTO>>
 }
