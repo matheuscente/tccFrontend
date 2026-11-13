@@ -19,6 +19,7 @@ A origem do front precisa estar em `CORS_ORIGINS` no `.env` da API (padrão `htt
 ## 2. Estrutura
 
 ```
+functions/api/[[path]].ts  proxy do Cloudflare Pages: repassa /api/* para a API (só em produção)
 src/
 ├── main.ts              cria o app, restaura a sessão e só então monta o router
 ├── App.vue              <v-app> + snackbar e diálogo de confirmação globais
@@ -116,3 +117,28 @@ Estudos (Início, Meus cursos com cada curso listado, Biblioteca), Acompanhament
 - **Arquivos**: para visualizar ou baixar, a página pede links temporários (`/files/:id/access`), porque `<video>`, `<img>` e `<iframe>` não enviam o token.
 - **Painel admin**: `/admin/tickets` reaproveita as páginas de suporte com `meta.adminMode`. No chamado, o admin usa **Atender** (assume o chamado: fica *Em atendimento* e só ele vê), **Transferir** (escolhe outro admin em `GET /admin/admins`), **Alterar status** (qualquer status, inclusive a partir de Respondido) e **Reabrir**. Ao responder um chamado que está com ele, pode manter em atendimento ou enviar como Respondido. A conversa mistura mensagens e o histórico (`events`: recebeu, transferiu, alterou status, encerrado pelo usuário/administrador). A lista tem a coluna Responsável e o filtro "Meus atendimentos".
 - **Datas**: a API recebe datas no formato `dd/mm/aaaa`; os campos usam `input type="date"` e convertem com `utils/date.ts`.
+
+## 6. Deploy gratuito (Cloudflare Pages)
+
+A API é publicada à parte, no Render (ver a seção "Deploy gratuito" do README do backend). O frontend fica no Cloudflare Pages, e a função `functions/api/[[path]].ts` repassa tudo que chega em `/api/*` para a API. Para o navegador, frontend e API ficam no mesmo endereço, então o cookie de sessão funciona em todos os navegadores (inclusive Safari e iPhone) e não há CORS.
+
+O build de produção usa o `.env.production`, com `VITE_BASE_URL=/api/v1`.
+
+1. No painel do Cloudflare, crie um projeto em **Workers & Pages → Pages → Connect to Git** e escolha este repositório.
+2. Configure o build:
+
+| Campo | Valor |
+|---|---|
+| Framework preset | `Vue` |
+| Root directory | `frontend` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+3. Em **Settings → Variables and Secrets**, crie `API_ORIGIN` com o endereço do serviço no Render, sem barra no final (ex.: `https://organizador-api.onrender.com`).
+4. Faça um novo deploy para a função ler a variável.
+5. No Render, ajuste `FRONTEND_URL`, `PUBLIC_API_URL` e `CORS_ORIGINS` com o endereço do Pages (ex.: `https://organizador.pages.dev`).
+
+Cada push na branch de produção publica uma nova versão. Sem um `404.html`, o Pages entrega o `index.html` para qualquer caminho, então recarregar uma rota do Vue Router (ex.: `/courses/123`) funciona.
+
+Limites do plano gratuito: os arquivos estáticos são ilimitados; as chamadas à API passam pela função, que tem cota diária compartilhada com Workers (100 mil requisições/dia no plano gratuito), e cada requisição pode ter no máximo 100 MB, por isso a API usa `MAX_FILE_SIZE_MB=95` em produção.
+
