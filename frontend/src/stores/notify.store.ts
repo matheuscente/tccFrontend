@@ -1,0 +1,23 @@
+import { defineStore } from "pinia";
+
+type NotifyColor = "success" | "error" | "info" | "warning";
+
+export const useNotifyStore = defineStore("notify", {
+  state: () => ({
+    visible: false,
+    message: "",
+    color: "success" as NotifyColor,
+  }),
+  actions: {
+    show(message: string, color: NotifyColor = "success") {
+      this.message = message;
+      this.color = color;
+      this.visible = false;
+      // fecha e reabre no próximo tick para reiniciar o timeout do snackbar já visível
+      queueMicrotask(() => { this.visible = true; });
+    },
+    success(message: string) { this.show(message, "success"); },
+    error(message: string) { this.show(message, "error"); },
+    info(message: string) { this.show(message, "info"); },
+  },
+});
