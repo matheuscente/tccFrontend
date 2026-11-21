@@ -49,15 +49,22 @@
             </div>
           </v-card-text>
           <v-card-actions>
-            <v-btn
-              color="primary"
-              variant="flat"
-              prepend-icon="mdi-play"
-              :disabled="activity.questionCount === 0"
-              :to="{ name: routeProps.activityAnswer.name, params: { id: activity.id } }"
-            >
-              Responder
-            </v-btn>
+            <!-- botão desabilitado não recebe eventos: o tooltip fica no span em volta dele -->
+            <v-tooltip text="Adicione questões para poder responder a atividade" location="top" :disabled="activity.questionCount > 0">
+              <template #activator="{ props: tooltipProps }">
+                <span v-bind="tooltipProps" class="d-inline-block" :tabindex="activity.questionCount === 0 ? 0 : undefined">
+                  <v-btn
+                    color="primary"
+                    variant="flat"
+                    prepend-icon="mdi-play"
+                    :disabled="activity.questionCount === 0"
+                    :to="{ name: routeProps.activityAnswer.name, params: { id: activity.id } }"
+                  >
+                    Responder
+                  </v-btn>
+                </span>
+              </template>
+            </v-tooltip>
             <v-btn variant="text" :to="{ name: routeProps.activityDetail.name, params: { id: activity.id } }">Gerenciar</v-btn>
           </v-card-actions>
         </v-card>
