@@ -1,6 +1,8 @@
 import type { FileKind } from "../Types/FileKind";
 
-export const MAX_UPLOAD_SIZE = 100 * 1024 * 1024;
+// mesmo limite da API (MAX_FILE_SIZE_MB=95): o proxy do Cloudflare recusa requisições acima de 100 MB
+export const MAX_UPLOAD_SIZE_MB = 95;
+export const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
 
 export const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024;
 

@@ -59,7 +59,7 @@ import { maxLength, required } from "@/utils/rules";
 import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
 import { noteService } from "@/modules/notes/services/note.service";
 import { fileService } from "@/modules/files/services/file.service";
-import { MAX_UPLOAD_SIZE } from "@/modules/files/models/constants/file.constants";
+import { MAX_UPLOAD_SIZE, MAX_UPLOAD_SIZE_MB } from "@/modules/files/models/constants/file.constants";
 import { positionsBetween } from "../utils/readerOrder";
 
 const props = withDefaults(defineProps<{ scope: Scope, before: number | null, after: number | null, label?: string }>(), { label: "Adicionar aqui" });
@@ -123,7 +123,7 @@ const onPick = async (event: Event) => {
     const current = queue.value[queue.value.length - 1]!;
     if (file.size > MAX_UPLOAD_SIZE) {
       current.status = "error";
-      current.error = "Arquivo maior que 100 MB";
+      current.error = `Arquivo maior que ${MAX_UPLOAD_SIZE_MB} MB`;
       continue;
     }
     const response = await fileService.upload(file, props.scope, (percent) => { current.progress = percent; }, positions[index]);
