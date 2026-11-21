@@ -99,6 +99,7 @@ import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface"
 import { useLatest } from "@/composables/useLatest";
 import { questionTypeLabels } from "../models/constants/question.constants";
 import type { QuestionDTO } from "../models/DTO/QuestionDto";
+import type { QuestionActivityUsageDTO } from "../models/DTO/QuestionActivityUsageDto";
 import { questionService } from "../services/question.service";
 import QuestionFormDialog from "./QuestionFormDialog.vue";
 import { hasScope, sameScope, scopeOf } from "@/utils/scope";
@@ -157,10 +158,20 @@ const openEdit = (question: QuestionDTO) => {
   dialog.value = true;
 };
 
+// monta o aviso de exclusão listando as atividades que perderão a questão
+const removeMessage = (activities: QuestionActivityUsageDTO[]) => {
+  if (!activities.length) return "A questão não é usada em nenhuma atividade e será removida do banco. Deseja continuar?";
+  const list = activities.map((activity) => `• ${activity.title}`).join("\n");
+  const label = activities.length === 1 ? "da atividade" : `das ${activities.length} atividades`;
+  return `A questão será removida do banco e ${label} abaixo:\n\n${list}\n\nDeseja continuar?`;
+};
+
 const remove = async (question: QuestionDTO) => {
+  const activities = await run(questionService.activityUsage(question.id));
+  if (!activities) return;
   const ok = await confirm.ask({
     title: "Excluir questão",
-    message: "A questão será removida do banco e das atividades em que aparece. Deseja continuar?",
+    message: removeMessage(activities),
     confirmText: "Excluir",
   });
   if (!ok) return;
