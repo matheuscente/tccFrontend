@@ -11,6 +11,10 @@ export const describeTicketEvent = (event: TicketEventDTO, ownerId: string): { t
       icon: "mdi-lock-outline",
     };
   }
+  // chamado devolvido para a fila porque o administrador que atendia deixou de ser administrador ou foi excluído
+  if (event.status === "OPEN" && event.target) {
+    return { text: `Chamado devolvido para a fila: ${event.target.name} deixou de atender como administrador`, icon: "mdi-account-arrow-left-outline" };
+  }
   const label = event.status ? ticketStatusInfo[event.status].label : "";
   return { text: `${event.actor.name} alterou o status para ${label}`, icon: "mdi-swap-horizontal" };
 };
