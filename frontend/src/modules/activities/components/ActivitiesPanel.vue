@@ -24,6 +24,16 @@
           <v-card-item>
             <v-card-title class="text-title-medium text-wrap">{{ activity.title }}</v-card-title>
             <v-card-subtitle class="mt-1"><ScopeLabel :scope="activity" /></v-card-subtitle>
+            <template #append>
+              <v-menu location="bottom end">
+                <template #activator="{ props: menuProps }">
+                  <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" :aria-label="`Ações da atividade ${activity.title}`" />
+                </template>
+                <v-list density="compact">
+                  <v-list-item prepend-icon="mdi-delete-outline" title="Excluir" base-color="error" @click="remove(activity)" />
+                </v-list>
+              </v-menu>
+            </template>
           </v-card-item>
           <v-card-text class="flex-grow-1">
             <p v-if="activity.description" class="text-body-medium text-medium-emphasis mb-3 description">{{ activity.description }}</p>
@@ -49,8 +59,6 @@
               Responder
             </v-btn>
             <v-btn variant="text" :to="{ name: routeProps.activityDetail.name, params: { id: activity.id } }">Gerenciar</v-btn>
-            <v-spacer />
-            <v-btn icon="mdi-delete-outline" variant="text" color="error" :aria-label="`Excluir atividade ${activity.title}`" @click="remove(activity)" />
           </v-card-actions>
         </v-card>
       </v-col>
