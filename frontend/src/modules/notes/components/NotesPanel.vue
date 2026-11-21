@@ -214,7 +214,16 @@ const save = async () => {
     if (stillSelected) selected.value = updated;
   }
   // edições feitas durante o envio continuam pendentes (o timer já reagendou o save)
-  if (stillSelected && version === editVersion) status.value = "saved";
+  const noPendingEdits = version === editVersion;
+  if (stillSelected && noPendingEdits) status.value = "saved";
+
+  // mudar o vínculo altera os contadores da página e pode tirar a nota da lista atual
+  if (scopeChanged) {
+    emit("changed");
+    await load();
+    const stillListed = notes.value.some((item) => item.id === note.id);
+    if (!stillListed && selected.value?.id === note.id && noPendingEdits) selected.value = null;
+  }
 };
 
 const retrySave = () => {
