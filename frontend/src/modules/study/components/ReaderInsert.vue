@@ -36,7 +36,10 @@
     <v-list v-if="queue.length" density="compact" class="pa-0 my-2">
       <v-list-item v-for="item in queue" :key="item.key" class="px-0" :title="item.file.name" :subtitle="item.error">
         <template #append>
-          <v-icon v-if="item.status === 'error'" icon="mdi-alert-circle" color="error" />
+          <template v-if="item.status === 'error'">
+            <v-icon icon="mdi-alert-circle" color="error" />
+            <v-btn icon="mdi-close" variant="text" size="small" :aria-label="`Dispensar aviso de ${item.file.name}`" @click="dismiss(item.key)" />
+          </template>
           <v-progress-circular v-else :model-value="item.progress" size="22" width="3" color="primary" />
         </template>
       </v-list-item>
@@ -96,6 +99,11 @@ const addNote = async () => {
   } finally {
     saving.value = false;
   }
+};
+
+// remove da lista o aviso de um arquivo recusado
+const dismiss = (key: string) => {
+  queue.value = queue.value.filter((entry) => entry.key !== key);
 };
 
 // envia um por vez, na ordem escolhida, com posições entre os dois vizinhos

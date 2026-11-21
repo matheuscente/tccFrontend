@@ -34,6 +34,9 @@
             <v-list-item-title class="text-body-medium">{{ item.file.name }}</v-list-item-title>
             <v-list-item-subtitle v-if="item.error" class="text-error">{{ item.error }}</v-list-item-subtitle>
             <v-progress-linear v-else :model-value="item.progress" :color="item.status === 'done' ? 'success' : 'primary'" height="4" rounded class="mt-1" />
+            <template v-if="item.status === 'error'" #append>
+              <v-btn icon="mdi-close" variant="text" size="small" :aria-label="`Dispensar aviso de ${item.file.name}`" @click="dismiss(item.key)" />
+            </template>
           </v-list-item>
         </v-list>
       </v-card-text>
@@ -222,6 +225,11 @@ const enqueue = (list: FileList | null | undefined) => {
     });
   });
   void processQueue();
+};
+
+// remove da lista o aviso de um arquivo recusado
+const dismiss = (key: string) => {
+  queue.value = queue.value.filter((entry) => entry.key !== key);
 };
 
 const onPick = (event: Event) => {
