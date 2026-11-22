@@ -24,6 +24,16 @@
           <v-card-item>
             <v-card-title class="text-title-medium text-wrap">{{ activity.title }}</v-card-title>
             <v-card-subtitle class="mt-1"><ScopeLabel :scope="activity" /></v-card-subtitle>
+            <template #append>
+              <v-menu location="bottom end">
+                <template #activator="{ props: menuProps }">
+                  <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="small" :aria-label="`Ações da atividade ${activity.title}`" />
+                </template>
+                <v-list density="compact">
+                  <v-list-item prepend-icon="mdi-delete-outline" title="Excluir" base-color="error" @click="remove(activity)" />
+                </v-list>
+              </v-menu>
+            </template>
           </v-card-item>
           <v-card-text class="flex-grow-1">
             <p v-if="activity.description" class="text-body-medium text-medium-emphasis mb-3 description">{{ activity.description }}</p>
@@ -39,18 +49,23 @@
             </div>
           </v-card-text>
           <v-card-actions>
-            <v-btn
-              color="primary"
-              variant="flat"
-              prepend-icon="mdi-play"
-              :disabled="activity.questionCount === 0"
-              :to="{ name: routeProps.activityAnswer.name, params: { id: activity.id } }"
-            >
-              Responder
-            </v-btn>
+            <!-- botão desabilitado não recebe eventos: o tooltip fica no span em volta dele -->
+            <v-tooltip text="Adicione questões para poder responder a atividade" location="top" :disabled="activity.questionCount > 0">
+              <template #activator="{ props: tooltipProps }">
+                <span v-bind="tooltipProps" class="d-inline-block" :tabindex="activity.questionCount === 0 ? 0 : undefined">
+                  <v-btn
+                    color="primary"
+                    variant="flat"
+                    prepend-icon="mdi-play"
+                    :disabled="activity.questionCount === 0"
+                    :to="{ name: routeProps.activityAnswer.name, params: { id: activity.id } }"
+                  >
+                    Responder
+                  </v-btn>
+                </span>
+              </template>
+            </v-tooltip>
             <v-btn variant="text" :to="{ name: routeProps.activityDetail.name, params: { id: activity.id } }">Gerenciar</v-btn>
-            <v-spacer />
-            <v-btn icon="mdi-delete-outline" variant="text" color="error" :aria-label="`Excluir atividade ${activity.title}`" @click="remove(activity)" />
           </v-card-actions>
         </v-card>
       </v-col>

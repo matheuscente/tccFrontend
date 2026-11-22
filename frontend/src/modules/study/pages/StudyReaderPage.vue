@@ -168,10 +168,10 @@
       </aside>
     </div>
 
-    <v-bottom-sheet v-model="tocOpen">
+    <v-bottom-sheet v-model="tocOpen" @after-leave="scrollToTocTarget">
       <v-card>
         <v-card-title class="text-title-medium pt-4">Sumário</v-card-title>
-        <ReaderToc :sections="sections" @go="(id) => { tocOpen = false; scrollTo(id); }" />
+        <ReaderToc :sections="sections" @go="goToSection" />
       </v-card>
     </v-bottom-sheet>
   </div>
@@ -369,6 +369,21 @@ const onAdded = async (id: string) => {
 
 const scrollTo = (id: string) => {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+// a rolagem só acontece depois que o sumário fecha: enquanto ele está aberto a página fica travada
+// e, ao fechar, volta para a posição antiga, desfazendo uma rolagem feita antes disso
+const tocTarget = ref<string | null>(null);
+
+const goToSection = (id: string) => {
+  tocTarget.value = id;
+  tocOpen.value = false;
+};
+
+const scrollToTocTarget = () => {
+  if (!tocTarget.value) return;
+  scrollTo(tocTarget.value);
+  tocTarget.value = null;
 };
 
 const download = async (file: StoredFileDTO) => {

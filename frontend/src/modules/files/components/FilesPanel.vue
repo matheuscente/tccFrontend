@@ -18,7 +18,7 @@
           <v-icon icon="mdi-cloud-upload-outline" size="40" color="primary" class="mb-2" />
           <div class="text-body-large">Arraste arquivos aqui ou <span class="text-primary font-weight-medium">clique para selecionar</span></div>
           <div class="text-body-small text-medium-emphasis">
-            Até 100 MB por arquivo<template v-if="fixed"> · serão vinculados a <ScopeLabel :scope="fixedScope" /></template>
+            Até {{ MAX_UPLOAD_SIZE_MB }} MB por arquivo<template v-if="fixed"> · serão vinculados a <ScopeLabel :scope="fixedScope" /></template>
           </div>
           <input ref="fileInput" type="file" multiple hidden @change="onPick" />
         </div>
@@ -34,6 +34,9 @@
             <v-list-item-title class="text-body-medium">{{ item.file.name }}</v-list-item-title>
             <v-list-item-subtitle v-if="item.error" class="text-error">{{ item.error }}</v-list-item-subtitle>
             <v-progress-linear v-else :model-value="item.progress" :color="item.status === 'done' ? 'success' : 'primary'" height="4" rounded class="mt-1" />
+            <template v-if="item.status === 'error'" #append>
+              <v-btn icon="mdi-close" variant="text" size="small" :aria-label="`Dispensar aviso de ${item.file.name}`" @click="dismiss(item.key)" />
+            </template>
           </v-list-item>
         </v-list>
       </v-card-text>
@@ -144,7 +147,7 @@ import { formatBytes, formatDateTime } from "@/utils/date";
 import { maxLength, required } from "@/utils/rules";
 import { useLatest } from "@/composables/useLatest";
 import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
-import { MAX_UPLOAD_SIZE } from "../models/constants/file.constants";
+import { MAX_UPLOAD_SIZE, MAX_UPLOAD_SIZE_MB } from "../models/constants/file.constants";
 import type { StoredFileDTO } from "../models/DTO/StoredFileDto";
 import { fileService } from "../services/file.service";
 import { fileIcon } from "../utils/fileKind";
@@ -218,10 +221,15 @@ const enqueue = (list: FileList | null | undefined) => {
       file,
       progress: 0,
       status: file.size > MAX_UPLOAD_SIZE ? "error" : "waiting",
-      ...(file.size > MAX_UPLOAD_SIZE ? { error: "Arquivo maior que 100 MB" } : {}),
+      ...(file.size > MAX_UPLOAD_SIZE ? { error: `Arquivo maior que ${MAX_UPLOAD_SIZE_MB} MB` } : {}),
     });
   });
   void processQueue();
+};
+
+// remove da lista o aviso de um arquivo recusado
+const dismiss = (key: string) => {
+  queue.value = queue.value.filter((entry) => entry.key !== key);
 };
 
 const onPick = (event: Event) => {

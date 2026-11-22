@@ -36,7 +36,10 @@
     <v-list v-if="queue.length" density="compact" class="pa-0 my-2">
       <v-list-item v-for="item in queue" :key="item.key" class="px-0" :title="item.file.name" :subtitle="item.error">
         <template #append>
-          <v-icon v-if="item.status === 'error'" icon="mdi-alert-circle" color="error" />
+          <template v-if="item.status === 'error'">
+            <v-icon icon="mdi-alert-circle" color="error" />
+            <v-btn icon="mdi-close" variant="text" size="small" :aria-label="`Dispensar aviso de ${item.file.name}`" @click="dismiss(item.key)" />
+          </template>
           <v-progress-circular v-else :model-value="item.progress" size="22" width="3" color="primary" />
         </template>
       </v-list-item>
@@ -56,7 +59,7 @@ import { maxLength, required } from "@/utils/rules";
 import type { Scope } from "@/modules/courses/models/interfaces/Scope.interface";
 import { noteService } from "@/modules/notes/services/note.service";
 import { fileService } from "@/modules/files/services/file.service";
-import { MAX_UPLOAD_SIZE } from "@/modules/files/models/constants/file.constants";
+import { MAX_UPLOAD_SIZE, MAX_UPLOAD_SIZE_MB } from "@/modules/files/models/constants/file.constants";
 import { positionsBetween } from "../utils/readerOrder";
 
 const props = withDefaults(defineProps<{ scope: Scope, before: number | null, after: number | null, label?: string }>(), { label: "Adicionar aqui" });
@@ -98,6 +101,11 @@ const addNote = async () => {
   }
 };
 
+// remove da lista o aviso de um arquivo recusado
+const dismiss = (key: string) => {
+  queue.value = queue.value.filter((entry) => entry.key !== key);
+};
+
 // envia um por vez, na ordem escolhida, com posições entre os dois vizinhos
 const onPick = async (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -115,7 +123,7 @@ const onPick = async (event: Event) => {
     const current = queue.value[queue.value.length - 1]!;
     if (file.size > MAX_UPLOAD_SIZE) {
       current.status = "error";
-      current.error = "Arquivo maior que 100 MB";
+      current.error = `Arquivo maior que ${MAX_UPLOAD_SIZE_MB} MB`;
       continue;
     }
     const response = await fileService.upload(file, props.scope, (percent) => { current.progress = percent; }, positions[index]);

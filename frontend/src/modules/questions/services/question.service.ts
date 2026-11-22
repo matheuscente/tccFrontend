@@ -5,6 +5,7 @@ import type { ScopeFilterDTO } from "@/modules/courses/models/DTO/ScopeFilterDto
 import type { QuestionDTO } from "../models/DTO/QuestionDto";
 import type { CreateQuestionDTO } from "../models/DTO/CreateQuestionDto";
 import type { UpdateQuestionDTO } from "../models/DTO/UpdateQuestionDto";
+import type { QuestionActivityUsageDTO } from "../models/DTO/QuestionActivityUsageDto";
 import type { QuestionServiceInterface } from "../models/interfaces/QuestionService.interface";
 
 export class QuestionService implements QuestionServiceInterface {
@@ -32,6 +33,10 @@ export class QuestionService implements QuestionServiceInterface {
 
   remove(id: string) {
     return this.api.delete<unknown>(`/questions/${id}`);
+  }
+
+  activityUsage(id: string) {
+    return this.api.get<QuestionActivityUsageDTO>(`/questions/${id}/activities`);
   }
 }
 

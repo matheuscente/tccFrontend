@@ -197,8 +197,17 @@ const loading = ref(false);
 const summary = ref<StudySummaryDTO | null>(null);
 const performance = ref<PerformanceDTO | null>(null);
 
-const customRangeError = computed(() =>
-  customStart.value && customEnd.value && customStart.value > customEnd.value ? "A data inicial não pode ser posterior à final." : "");
+// mesmo limite da API (2 anos de 366 dias), para avisar antes de enviar
+const MAX_PERIOD_DAYS = 366 * 2;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const customRangeError = computed(() => {
+  if (!customStart.value || !customEnd.value) return "";
+  if (customStart.value > customEnd.value) return "A data inicial não pode ser posterior à final.";
+  const days = (Date.parse(customEnd.value) - Date.parse(customStart.value)) / DAY_MS;
+  if (days > MAX_PERIOD_DAYS) return "O período máximo é de 2 anos.";
+  return "";
+});
 const customRangeValid = computed(() => !!customStart.value && !!customEnd.value && !customRangeError.value);
 
 const scopeGroupLabel = computed(() => {
@@ -238,8 +247,9 @@ const load = async () => {
       runOne(statsService.performance(query)),
     ]);
     if (!latest.isLatest(request)) return;
-    summary.value = summaryData;
-    performance.value = performanceData;
+    // se a API recusar o período, o erro já foi exibido e os últimos dados válidos continuam na tela
+    if (summaryData) summary.value = summaryData;
+    if (performanceData) performance.value = performanceData;
   } finally {
     if (latest.isLatest(request)) loading.value = false;
   }
